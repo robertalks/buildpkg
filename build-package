@@ -188,6 +188,7 @@ do_unpack()
  fi
 }
 
+# download patch
 get_patch()
 {
  local url=$1
@@ -208,6 +209,7 @@ get_patch()
  fi
 }
 
+# run configure for package
 do_configure()
 {
  local name=$1
@@ -275,6 +277,7 @@ do_configure()
  fi
 }
 
+# make and install package
 run_make()
 {
  local CPUs=$(grep MHz /proc/cpuinfo | wc -l)
@@ -308,6 +311,7 @@ run_make()
  fi
 }
 
+# change ownership
 chown_dir()
 {
  local dir=$1
@@ -324,6 +328,7 @@ chown_dir()
  fi
 }
 
+# strip directory
 strip_binary()
 {
  local dir=$1
@@ -336,6 +341,7 @@ strip_binary()
  fi
 }
 
+# strip file
 strip_file()
 {
  local file=$1
@@ -347,6 +353,7 @@ strip_file()
  fi
 }
 
+# create user and group
 create_user()
 {
  # example: create_user www 10100 "Web User" /home/www
@@ -374,6 +381,7 @@ create_user()
  ${cmd} /usr/sbin/grpck -s 2>/dev/null || msg error "Failed to sort /etc/group."
 }
 
+# trigger package re-build.
 trigger()
 {
  local name=$1
@@ -390,6 +398,7 @@ trigger()
  fi
 }
 
+# stop server/service
 stop_server()
 {
  local name=$1
@@ -401,6 +410,7 @@ stop_server()
  fi
 }
 
+# start server/service
 start_server()
 {
  local name=$1
@@ -412,6 +422,7 @@ start_server()
  fi
 }
 
+# trigger rebuild of mysql, very important
 need_mysql()
 {
  local name=$1
@@ -421,6 +432,7 @@ need_mysql()
  fi
 }
 
+# build and install mysql server
 build_mysql()
 {
  local name="mysql"
@@ -497,6 +509,7 @@ build_mysql()
  cd $CWD
 }
 
+# # build and install nginx
 build_nginx()
 {
  local name="nginx"
@@ -543,6 +556,7 @@ build_nginx()
  cd $CWD
 }
 
+# # build and install php
 build_php()
 {
  local name="php"
@@ -625,6 +639,7 @@ build_php()
  cd $CWD
 }
 
+# build and install monit
 build_monit()
 {
  local name="monit"
@@ -658,6 +673,7 @@ build_monit()
  cd $CWD
 }
 
+# build and install eaccelerator
 build_eaccelerator()
 {
  local name="eaccelerator"
@@ -686,6 +702,7 @@ build_eaccelerator()
  cd $CWD
 }
 
+# build and install postfix
 build_postfix()
 {
  local name="postfix"
@@ -761,6 +778,7 @@ build_postfix()
  cd $CWD
 }
 
+# build and install greyfix
 build_greyfix()
 {
  local name="greyfix"
@@ -791,6 +809,7 @@ build_greyfix()
  cd $CWD
 }
 
+# build and install dovecot
 build_dovecot()
 {
  local name="dovecot"
@@ -845,6 +864,7 @@ build_dovecot()
  cd $CWD
 }
 
+# build and install clamav
 build_clamav()
 {
  local name="clamav"
@@ -887,6 +907,7 @@ build_clamav()
  cd $CWD
 }
 
+# build and install clamsmtp
 build_clamsmtp()
 {
  local name="clamsmtp"
@@ -917,6 +938,7 @@ build_clamsmtp()
  cd $CWD
 }
 
+# build and install pam_mysql
 build_pam_mysql()
 {
  local name="pam_mysql"
@@ -946,6 +968,7 @@ build_pam_mysql()
  cd $CWD
 }
 
+# build and install postfix-policyd-spf
 build_spf()
 {
  local name="postfix-policyd-spf-perl"
@@ -972,6 +995,7 @@ build_spf()
  cd $CWD
 }
 
+# build and install all available packages
 build_all()
 {
  export buildall=1
@@ -981,6 +1005,7 @@ build_all()
  done
 }
 
+# trap Ctrl+C
 control_c()
 {
  echo
