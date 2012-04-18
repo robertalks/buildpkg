@@ -1,14 +1,9 @@
 #!/bin/bash
 
 NAME=buildpkg
-VERSION=1.0.0
+VERSION=1.0.1
 CWD=$(pwd)
-PREFIX="/appls"
 TARGET="$(dpkg-architecture -qDEB_HOST_GNU_TYPE 2>/dev/null)"
-DATA="/srv"
-DBDATA="${DATA}/databases"
-TMPSRV="/var/webservice"
-HOST=$(hostname -f)
 
 mysqlver=5.5.23
 nginxver=1.1.18
@@ -97,6 +92,27 @@ msg()
    *)
     echo 'msg(): missing arguments, usage: "error some message"' ;;
  esac
+}
+
+# setup global variables
+set_global_conf()
+{
+
+ if [ -s /etc/buildpkg.conf ]; then
+    source /etc/buildpkg.conf
+ elif [ -s $CWD/buildpkg.conf ]; then
+    source $CWD/buildpkg.conf
+ elif [ -s $CWD/.buildpkg.conf ]; then
+    source $CWD/.buildpkg.conf
+ fi
+
+ [ -z $PREFIX ] && PREFIX=/appls
+ [ -z $DATA ] && DATA=/srv
+ [ -z $MYDB ] && MYDB=/srv/databases
+ [ -z $TMPSRV ] && TMPSRV=/var/webservice
+ [ -z $HOST ] && HOST=$(hostname -f)
+
+ export PREFIX DATA MYDB TMPSRV HOST
 }
 
 # check if we are running Debian or Ubuntu or some derivate.
@@ -294,7 +310,7 @@ do_configure()
    cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}/${name}" \
-    -DINSTALL_MYSQLDATADIR="${DBDATA}/${name}" \
+    -DINSTALL_MYSQLDATADIR="${MYDB}/${name}" \
     -DSYSCONFDIR="${PREFIX}/${name}/conf" \
     ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "postfix" ]; then
@@ -366,20 +382,6 @@ chown_dir()
  local whoami="$(whoami)"
 
  chown ${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
-}
-
-# change ownership to root
-chown_root()
-{
- local dir=$1
- local uid=$(id -u)
- local cmd="chown root.root -R ${dir}"
-
- if [ $uid -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
-
- $cmd >/dev/null 2>&1 || msg error "Failed to change ownership to root on ${dir}."
 }
 
 # change ownership as root
@@ -676,10 +678,10 @@ build_mysql()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${mysqlurl}"
- local mylogdir="${DBDATA}/log"
+ local mylogdir="${MYDB}/log"
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
- local dbdir="${DBDATA}/${name}"
+ local dbdir="${MYDB}/${name}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -713,7 +715,7 @@ build_mysql()
   -DWITH_ZLIB=system \
   -DWITH_SSL=system \
   -DWITH_LIBWRAP=OFF \
-  -DMYSQL_DATADIR=${DBDATA}/${name} \
+  -DMYSQL_DATADIR=${MYDB}/${name} \
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock \
   -DFEATURE_SET=community \
   -DCOMPILATION_COMMENT='MySQL Community Server' \
@@ -736,17 +738,17 @@ build_mysql()
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
     [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
     cp_as_root "-f" support-files/my-small.cnf ${PREFIX}/${name}/conf/my.cnf
-    chown_root ${PREFIX}/${name}/conf
+    chown_as_root root root ${PREFIX}/${name}/conf
  fi
 
- if [ ! -e ${DBDATA}/${name}/mysql/db.frm ]; then
+ if [ ! -e ${MYDB}/${name}/mysql/db.frm ]; then
     [ -e ${db_install_log} ] && rm -f ${db_install_log}
     export PATH="${PREFIX}/${name}/bin:$PATH"
-    msg info "Installing MySQL database in ${DBDATA}/${name} ..."
+    msg info "Installing MySQL database in ${MYDB}/${name} ..."
     msg warn "*** (for more information please check ${db_install_log}) ***"
     ${PREFIX}/${name}/scripts/mysql_install_db \
       --basedir=${PREFIX}/${name} \
-      --datadir=${DBDATA}/${name} \
+      --datadir=${MYDB}/${name} \
       --user=mysql > ${db_install_log}
  else
    msg info "MySQL database found, we wont do nothing."
@@ -887,7 +889,7 @@ build_php()
     [ -d ${PRERIX}/${name}/conf ] || mkdir_as_root ${PRERIX}/${name}/conf
     msg info "Copying new configuration file for php (php.ini) ..."
     cp_as_root "-f" php.ini-recommended ${PRERIX}/${name}/conf/php.ini
-    chown_root ${PRERIX}/${name}/conf
+    chown_as_root root root ${PRERIX}/${name}/conf
  fi
 
  if [ ${buildall} -eq 0 ]; then
@@ -1306,8 +1308,11 @@ control_c()
  exit $?
 }
 
-# check first if we have sudo, in case we run with normal user
+# check first if we have sudo, in case we run with normal user.
 is_sudo
+
+# set global variables before running anything.
+set_global_conf
 
 OPT="$@"
 if [ -z "${OPT}" ]; then
