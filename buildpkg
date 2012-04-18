@@ -68,7 +68,7 @@ Usage: $NAME [options...]
   OPTIONS:
    --help              display this message.
    --pkg=package       build specific package.
-   --dont-trigger      disable trigger build, need it by some packages.
+   --dont-trigger      disable trigger (re)build of packages.
    --all               build all available packages.
 
   EXAMPLE:
@@ -191,10 +191,10 @@ get_pkg()
  fi
 
  if [ ! -e ${srcdir}/${src} ]; then
-    msg info "Fetching source ${src} from ${url} ..."
+    msg info "Fetching source archive ${src} from ${url} ..."
     /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${srcdir}/${src}" "${url}" || { msg error "Failed to download ${src} from ${url}."; exit 1; }
  else
-    msg warn "Tarball ${src} already exists."
+    msg warn "Source archive ${src} already exists."
  fi
 }
 
@@ -228,10 +228,10 @@ get_patch()
  fi
 
  if [ ! -e ${patchfile} ]; then
-    msg info "Fetching patch ${patchfile} from ${url}/${patchname}"
+    msg info "Fetching patch file ${patchfile} from ${url}/${patchname}"
     /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${patchfile}" "${url}/${patchname}" || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
  else
-   msg warn "Patch ${patchname} wont be downloaded, already exists."
+   msg warn "Patch file ${patchname} already exists."
  fi
 }
 
@@ -353,10 +353,10 @@ chown_dir()
 }
 
 # strip directory
-strip_binary()
+strip_dir()
 {
  local dir=$1
- msg info "Stripping binaries ..."
+ msg info "Stripping binaries in ${dir} ..."
  if [ -d ${dir} ]; then
     find $dir | xargs file | grep -e "executable" -e "shared object" | grep ELF \
        | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
@@ -369,7 +369,7 @@ strip_binary()
 strip_file()
 {
  local file=$1
- msg info "Stripping binary(s) ..."
+ msg info "Stripping binary file ${file} ..."
  if [ -e ${file} ]; then
     strip --strip-unneeded ${file} 2> /dev/null || true
  else
@@ -405,20 +405,20 @@ create_user()
  ${cmd} /usr/sbin/grpck -s 2>/dev/null || msg error "Failed to sort /etc/group."
 }
 
-# trigger package re-build.
+# trigger package (re)build.
 trigger()
 {
  local name=$1
  if [ $triggeroff -ne 1 ]; then
   if [ -n ${name} ]; then
      sleep 2
-     msg info "Triggered build (re-build) of ${name} ..."
-     build_${name} 2>/dev/null || msg error "Failed to build (re-build) ${name}."
+     msg info "Triggered (re)build of ${name} ..."
+     build_${name} 2>/dev/null || msg error "Failed to (re)build ${name}."
   else
      msg warn "Nothing triggered ..."
   fi
  else
-  msg warn "Trigger is disabled, ${name} wont be build (re-build)."
+  msg warn "Trigger is disabled, ${name} wont be (re)build."
  fi
 }
 
@@ -452,8 +452,8 @@ need_mysql()
  local name=$1
  export buildall=1
 
- if [ ! -x ${PREFIX}/mysql/bin/mysql ]; then
-   msg info "MySQL is not available, we need it before building ${name}"
+ if [ ! -x ${PREFIX}/mysql/bin/mysql_config ]; then
+   msg info "MySQL is not installed, we need it before building ${name}"
    trigger mysql
  fi
 }
@@ -477,7 +477,9 @@ build_mysql()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${mysqlurl}"
- local logdir="${DBDATA}/log"
+ local mylogdir="${DBDATA}/log"
+ local logdir=$CWD/log
+ local db_install_log=${logdir}/${name}-db-install.log
  local dbdir="${DBDATA}/${name}"
 
  [ -d build ] || mkdir -p build
@@ -519,13 +521,13 @@ build_mysql()
   -DMANUFACTURER=$HOST"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
  create_user mysql 10101 "MySQL Server" /srv/databases/mysql
 
  [ -d ${dbdir} ] || mkdir -p -m 0770 ${dbdir}
  chown mysql.mysql ${dbdir}
- [ -d ${logdir} ] || mkdir -p -m 0770 ${logdir}
- chown mysql.mysql ${logdir}
+ [ -d ${mylogdir} ] || mkdir -p -m 0770 ${mylogdir}
+ chown mysql.mysql ${mylogdir}
 
  echo "${PREFIX}/${name}/lib" > /etc/ld.so.conf.d/mysql.conf
 
@@ -533,7 +535,20 @@ build_mysql()
 
  if [ -x /sbin/ldconfig ]; then
     /sbin/ldconfig
-    sleep 5
+    sleep 1
+ fi
+
+ if [ ! -e ${DBDATA}/${name}/mysql/db.frm ]; then
+    [ -e ${db_install_log} ] && rm -f ${db_install_log}
+    export PATH="${PREFIX}/${name}/bin:$PATH"
+    msg info "Installing MySQL database in ${DBDATA}/${name} ..."
+    msg warn "*** (for more information please check ${db_install_log}) ***"
+    ${PREFIX}/${name}/scripts/mysql_install_db \
+      --basedir=${PREFIX}/${name} \
+      --datadir=${DBDATA}/${name} \
+      --user=mysql > ${db_install_log}
+ else
+   msg info "MySQL database found, we wont do nothing."
  fi
 
  if [ ${buildall} -eq 0 ]; then
@@ -587,7 +602,7 @@ build_nginx()
   --without-mail_smtp_module"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
  create_user www 10100 "Nginx Web Server" /srv/www
 
  cd $CWD
@@ -665,7 +680,7 @@ build_php()
  stop_server php-fastcgi
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
@@ -702,7 +717,7 @@ build_monit()
   --enable-optimized"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  [ -d /var/run/${name} ] || mkdir -p -m 0750 /var/run/${name}
  [ -d ${PREFIX}/${name}/conf ] || mkdir -p -m 0750 ${PREFIX}/${name}/conf
@@ -739,7 +754,7 @@ build_eaccelerator()
  do_configure ${name} "--enable-eaccelerator=shared"
 
  run_make ${name}
- strip_binary ${PREFIX}/php
+ strip_dir ${PREFIX}/php
 
  cd $CWD
 }
@@ -782,7 +797,7 @@ build_postfix()
  stop_server ${name}
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  [ -d ${lib} ] || mkdir -p ${lib}
  [ -d ${queue} ] || mkdir -p ${queue}
@@ -848,7 +863,7 @@ build_greyfix()
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  rm -fr ${PREFIX}/${name}/var
  mkdir -p /var/lib/${name}
@@ -897,7 +912,7 @@ build_dovecot()
   --with-zlib"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  create_user dovecot 10104 "Dovecot IMAP Server" ${PREFIX}/${name}
  create_user dovenull 10105 "Dovecot Null User" ${PREFIX}/${name}
@@ -949,7 +964,7 @@ build_clamav()
   --program-suffix="
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  mkdir -p -m 0755 /var/lib/${name}
  chown clamav.root /var/lib/${name} || { msg error "Failed to change /var/lib/${name} directory ownership."; exit 1; }
@@ -982,12 +997,12 @@ build_clamsmtp()
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- cat $CWD/patch/use_mkstemp.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ # cat $CWD/patch/use_mkstemp.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
- strip_binary ${PREFIX}/${name}
+ strip_dir ${PREFIX}/${name}
 
  mkdir -p ${PREFIX}/${name}/conf
  mkdir -p -m 0750 ${PREFIX}/${name}/run
@@ -1069,7 +1084,7 @@ build_all()
 
  export buildall=1
  for name in $PACKAGES; do
-    msg info "Building : build_${name}"
+    msg info "Building: ${name}"
     build_${name}
  done
 }
@@ -1112,11 +1127,9 @@ while [ $# -gt 0 ]; do
   ;;
 
   --all)
-     msg warn "Building all available packages ($(echo $PACKAGES | sed 's/ /, /g'))"
-     msg warn "This option will build all packages and it can take up to several hours"
-     msg warn "to finish depending on the speed of your server."
-     msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or"
-     msg warn "Enter to continue with package build."
+     msg warn "Building all available packages: $(echo $PACKAGES | sed 's/ /, /g')"
+     msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
+     msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
      read
      build_all
   ;;
