@@ -99,6 +99,26 @@ msg()
  esac
 }
 
+# check if we are running Debian or Ubuntu or some derivate.
+is_debian()
+{
+ local distro=
+ if [ -x /usr/bin/lsb_release ]; then
+   distro=$(/usr/bin/lsb_release -i -s 2>/dev/null)
+   if [ "$distro" == "Debian" -o "$distro" == "Ubuntu" ]; then
+      msg info "Running $distro, we can do this."
+   else
+      msg error "We can only do this on Debian or Ubuntu based distribution."
+      exit 1
+   fi
+ elif [ -e /etc/debian_version ]; then
+   msg warn "We can continue, but we are running some unknown version of Debian."
+ else
+   msg error "We can only do this on Debian or Ubuntu based distribution."
+   exit 1
+ fi
+}
+
 # download package (using apt-get)
 get_package()
 {
@@ -296,11 +316,11 @@ run_make()
 
  msg info "Logfile saved in ${logfile}"
  msg info "Building ${name} ( make -j${CPUs} )"
- make -j"${CPUs}" > ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+ make -j"${CPUs}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
  if [ "${name}" != "postfix" ]; then
     msg info "Installing ${name} ( make install )"
-    make install > ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+    make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  else
     msg info "Installing ${name} ( sh ./postfix-install -non-interactive )"
     sh ./postfix-install -non-interactive \
@@ -313,7 +333,7 @@ run_make()
       readme_directory="/doc" \
       mail_owner="postfix" \
       setgid_group="postdrop" \
-      manpage_directory="/man" > ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+      manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  fi
 }
 
@@ -1045,6 +1065,10 @@ build_spf()
 # build and install all available packages
 build_all()
 {
+ # check if is debian/ubuntu, if not exit,
+ # we can't handle other type of distro's, yet.
+ is_debian
+
  export buildall=1
  for name in $PACKAGES; do
     msg info "Building : build_${name}"
@@ -1123,6 +1147,10 @@ if [ $buildpkg -eq 1 ]; then
          usage
          exit 1
       else
+         # check if is debian/ubuntu, if not exit,
+         # we can't handle other type of distro's, yet.
+         is_debian
+
          msg info "Building now package: $name"
          build_${name}
       fi
