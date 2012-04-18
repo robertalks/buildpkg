@@ -57,18 +57,20 @@ export triggeroff=0
 usage()
 {
  cat << EOF
-$NAME script $VERSION (written by Robert Gabriel <robert@linux-source.org>)
+$NAME script $VERSION
+Report bugs at <robert@linux-source.org>
+
 Usage: $NAME [options...]
 
   OPTIONS:
-   --help              display this message.
-   --pkg=package       build specific package.
-   --dont-trigger      disable trigger (re)build of packages.
-   --all               build all available packages.
+    --help              display this message.
+    --pkg=package       build specific package.
+    --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
+    --all               build all available packages.
 
   EXAMPLE:
     $NAME --pkg=mysql (build mysql package)
-     or
+      or
     $NAME --all (build all packages available)
 
   AVAILABLE PACKAGES:
@@ -97,7 +99,6 @@ msg()
 # setup global variables
 set_global_conf()
 {
-
  if [ -s /etc/buildpkg.conf ]; then
     source /etc/buildpkg.conf
  elif [ -s $CWD/buildpkg.conf ]; then
@@ -1327,9 +1328,9 @@ trap control_c SIGINT
 
 while [ $# -gt 0 ]; do
  case "$1" in
-  --dont-trigger)
-     export triggeroff=1
-     shift
+  --help)
+    usage
+    exit 0
   ;;
 
   --pkg*)
@@ -1342,17 +1343,16 @@ while [ $# -gt 0 ]; do
      buildpkg=1
   ;;
 
+  --dont-trigger)
+     export triggeroff=1
+  ;;
+
   --all)
      msg warn "Building all available packages: $(echo $PACKAGES | sed 's/ /, /g')"
      msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
      msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
      read
      build_all
-  ;;
-
-  --help)
-    usage
-    exit 0
   ;;
 
   *)
