@@ -23,9 +23,9 @@ clamavver=0.97.4
 clamsmtpver=1.10
 pam_mysqlver=0.7RC1
 
-mysqlurl="http://dev.mysql.com/get/Downloads/MySQL-5.5/mysql-${mysqlver}.tar.gz/from/http://mysql.he.net/"
+mysqlurl="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${mysqlver}.tar.gz"
 nginxurl="http://nginx.org/download/nginx-${nginxver}.tar.gz"
-phpurl="http://us.php.net/get/php-${phpver}.tar.bz2/from/this/mirror"
+phpurl="http://www.php.net/distributions/php-${phpver}.tar.bz2"
 moniturl="http://www.mmonit.com/monit/dist/monit-${monitver}.tar.gz"
 eacceleratorurl="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${eacceleratorver}.tar.bz2"
 postfixurl="http://postfix.ezarticleinformation.com/official/postfix-${postfixver}.tar.gz"
@@ -39,10 +39,10 @@ pam_mysqlurl="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${pam
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
-libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev \
-libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev \
+libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
+libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
 libdb-dev libdb4.8-dev libcurl4-openssl-dev libcurl3 libbz2-dev \
-libc-client2007e-dev libevent-dev libexpat1-dev libjpeg62-dev \
+libc-client2007e-dev libevent-dev libexpat1-dev libjpeg62-dev libxslt1-dev \
 libkrb5-dev libldap2-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
 libsasl2-dev libtidy-dev re2c zlib1g-dev patch bzip2"
 monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev"
@@ -53,7 +53,7 @@ spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
 
-PACKAGES="monit nginx mysql pam_mysql php eaccelerator clamav clamsmtp postfix dovecot greyfix spf"
+PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql"
 
 export buildall=0
 export triggeroff=0
@@ -67,17 +67,17 @@ Usage: $NAME [options...]
 
   OPTIONS:
    --help              display this message.
-   --build=[pkgname]   build specific package.
+   --pkg=package       build specific package.
    --dont-trigger      disable trigger build, need it by some packages.
    --all               build all available packages.
 
   EXAMPLE:
-    $NAME --build=mysql (build mysql package)
+    $NAME --pkg=mysql (build mysql package)
      or
     $NAME --all (build all packages available)
 
   AVAILABLE PACKAGES:
-    packages: $PACKAGES
+    $PACKAGES
 
 EOF
 }
@@ -171,8 +171,8 @@ get_pkg()
  fi
 
  if [ ! -e ${srcdir}/${src} ]; then
-    msg info "Fetching ${src} from ${url} ..."
-    /usr/bin/curl -# -k -f -o "${srcdir}/${src}" "${url}" 2>/dev/null || { msg error "Failed to download ${src} from ${url}."; exit 1; }
+    msg info "Fetching source ${src} from ${url} ..."
+    /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${srcdir}/${src}" "${url}" || { msg error "Failed to download ${src} from ${url}."; exit 1; }
  else
     msg warn "Tarball ${src} already exists."
  fi
@@ -208,7 +208,8 @@ get_patch()
  fi
 
  if [ ! -e ${patchfile} ]; then
-    /usr/bin/curl -# -k -f -o "${patchfile}" "${url}/${patchname}" 2>/dev/null || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
+    msg info "Fetching patch ${patchfile} from ${url}/${patchname}"
+    /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${patchfile}" "${url}/${patchname}" || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
  else
    msg warn "Patch ${patchname} wont be downloaded, already exists."
  fi
@@ -367,9 +368,9 @@ create_user()
  local name=$3 # username geos
  local home=$4 # username home
  local cmd=
- local uid=$(id -u)
+ local curruid=$(id -u)
 
- if [ $uid -ne 0 ]; then
+ if [ $curruid -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -427,13 +428,26 @@ start_server()
  fi
 }
 
-# trigger rebuild of mysql, very important
+# trigger build of mysql, very important
 need_mysql()
 {
  local name=$1
+ export buildall=1
+
  if [ ! -x ${PREFIX}/mysql/bin/mysql ]; then
    msg info "MySQL is not available, we need it before building ${name}"
    trigger mysql
+ fi
+}
+
+# trigger build of php, some packages need this
+need_php()
+{
+ local name=$1
+ export buildall=1
+ if [ ! -x ${PREFIX}/php/bin/phpize ]; then
+   msg info "PHP is not available, we need it before building ${name}"
+   trigger php
  fi
 }
 
@@ -458,7 +472,7 @@ build_mysql()
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- # cat $CWD/patch/dont-build-examples-and-tests.patch | patch -p1 || { msg error "Failed to apply patch."; exit 1; }
+ # cat $CWD/patch/dont-build-examples-and-tests.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -505,16 +519,16 @@ build_mysql()
  fi
 
  if [ ${buildall} -eq 0 ]; then
-    # trigger pam_mysql
+    trigger pam_mysql
     trigger dovecot
-    # trigger postfix
-    # trigger php
+    trigger postfix
+    trigger php
  fi
 
  cd $CWD
 }
 
-# # build and install nginx
+# build and install nginx
 build_nginx()
 {
  local name="nginx"
@@ -561,7 +575,7 @@ build_nginx()
  cd $CWD
 }
 
-# # build and install php
+# build and install php
 build_php()
 {
  local name="php"
@@ -575,7 +589,7 @@ build_php()
  [ -d ${dir} ] && rm -fr ${dir}
 
  # we need to make sure mysql is already installed.
- need_mysql
+ need_mysql ${name}
 
  get_dependency ${name}
 
@@ -585,7 +599,7 @@ build_php()
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- zcat $CWD/patch/suhosin-patch-5.2.16-0.9.7.patch.gz | patch -p1 || { msg error "Failed to apply patch."; exit 1; }
+ zcat $CWD/patch/suhosin-patch-5.2.16-0.9.7.patch.gz | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name} \
  "--enable-inline-optimization \
@@ -691,13 +705,18 @@ build_eaccelerator()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ # we need to make sure php is already installed.
+ need_php ${name}
+
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
  export PATH="${PREFIX}/php/bin:$PATH"
- phpize
+ ${PREFIX}/php/bin/phpize >/dev/null 2>&1 || { msg error "Failed while running ${PREFIX}/php/bin/phpize."; exit 1; }
 
  do_configure ${name} "--enable-eaccelerator=shared"
 
@@ -722,13 +741,18 @@ build_postfix()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  get_patch http://vda.sourceforge.net/VDA postfix-vda-v10-2.8.8.patch
 
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- cat $CWD/patch/postfix-vda-v10-2.8.8.patch | patch -p1 || { msg error "Failed to apply patch."; exit 1; }
+ cat $CWD/patch/postfix-vda-v10-2.8.8.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name}
 
@@ -796,6 +820,8 @@ build_greyfix()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
  chown_dir ${dir}
@@ -826,6 +852,11 @@ build_dovecot()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
+
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
+ get_dependency ${name}
 
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
@@ -882,6 +913,8 @@ build_clamav()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
  chown_dir ${dir}
@@ -925,11 +958,13 @@ build_clamsmtp()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- cat $CWD/patch/use_mkstemp.patch | patch -p1 || { msg error "Failed to apply patch."; exit 1; }
+ cat $CWD/patch/use_mkstemp.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name} "--disable-dependency-tracking"
 
@@ -955,6 +990,11 @@ build_pam_mysql()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
+
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
+ get_dependency ${name}
 
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
@@ -986,6 +1026,8 @@ build_spf()
  cd build
  [ -d ${dir} ] && rm -fr ${dir}
 
+ get_dependency ${name}
+
  get_pkg ${url} ${tarball}
  do_unpack ${tarball}
  chown_dir ${dir}
@@ -1014,7 +1056,8 @@ build_all()
 control_c()
 {
  echo
- msg warn "Ctrl+C was press, we are existing..."
+ msg warn "Ctrl+C was pressed, we are existing ..."
+ sleep 5
  exit $?
 }
 
@@ -1036,9 +1079,9 @@ while [ $# -gt 0 ]; do
      shift
   ;;
 
-  --build*)
-     if [ "$1" != "${1##--build=}" ]; then
-        name="${1##--build=}"
+  --pkg*)
+     if [ "$1" != "${1##--pkg=}" ]; then
+        name="${1##--pkg=}"
      else
         name=$2
         shift
@@ -1052,8 +1095,8 @@ while [ $# -gt 0 ]; do
      msg warn "to finish depending on the speed of your server."
      msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or"
      msg warn "Enter to continue with package build."
-     read key
-     # build_all
+     read
+     build_all
   ;;
 
   --help)
@@ -1077,7 +1120,7 @@ if [ $buildpkg -eq 1 ]; then
       pkg=$(echo $PACKAGES | grep -w ${name} 2>/dev/null)
       if [ -z "$pkg" ]; then
          msg error "$name package is not available at this moment."
-         msg info "available packages are: $(echo $PACKAGES | sed 's/ /, /g')"
+         usage
          exit 1
       else
          msg info "Building now package: $name"
