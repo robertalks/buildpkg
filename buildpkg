@@ -119,6 +119,22 @@ is_debian()
  fi
 }
 
+# if we are normal user, check if sudo is installed
+# otherwise we can't really do anything
+is_sudo()
+{
+ local uid=$(id -u)
+
+ if [ $uid -ne 0 ]; then
+    if [ ! -x /usr/bin/sudo ]; then
+       msg error "Sudo not found, we are running as normal user, we cant go on."
+       msg error "Please install sudo as root and then try again, or run $NAME with root rights."
+       sleep 5
+       exit 1
+    fi
+ fi
+}
+
 # download package (using apt-get)
 get_package()
 {
@@ -199,7 +215,7 @@ get_pkg()
 }
 
 # unpack package source
-do_unpack()
+unpack_source()
 {
  local tarname=$1
  local cwd=${CWD}
@@ -245,7 +261,7 @@ do_configure()
  local logfile=${logdir}/${name}-configure.log
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
- [ -e ${logfile} ] && rm -f ${logfile}
+ [ -e ${logfile} ] && rm -f ${logfile} || :
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
@@ -286,7 +302,7 @@ do_configure()
    make makefiles \
     DEBUG="" \
     CCARGS=" \
-     -DDEF_CONFIG_DIR="\\"\"${PREFIX}/postfix/conf\\"\"" \
+     -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
      -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
      -DHAS_MYSQL -I${PREFIX}/mysql/include \
@@ -310,56 +326,218 @@ run_make()
  local name=$1
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-build.log
- local installcmd="make install"
+ local cmd=
  local uid=$(id -u)
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
- [ -e ${logfile} ] && rm -f ${logfile}
+ [ -e ${logfile} ] && rm -f ${logfile} || :
 
  msg info "Logfile saved in ${logfile}"
- msg info "Building ${name} ( make -j${CPUs} )"
+ msg info "Building ${name} (make -j${CPUs})"
  make -j"${CPUs}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
  if [ $uid -ne 0 ]; then
-    installcmd="sudo ${installcmd}"
+    cmd="sudo"
  fi
 
  if [ "${name}" != "postfix" ]; then
-    msg info "Installing ${name} ( make install )"
-    ${installcmd} >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+    msg info "Installing ${name} ($cmd make install)"
+    $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  else
-    msg info "Installing ${name} ( sh ./postfix-install -non-interactive )"
-    sh ./postfix-install -non-interactive \
-      install_root="${PREFIX}/${name}" \
-      config_directory="/conf" \
-      command_directory="/sbin" \
-      daemon_directory="/libexec" \
-      sample_directory="/sample" \
-      html_directory="/html" \
-      readme_directory="/doc" \
-      mail_owner="postfix" \
-      setgid_group="postdrop" \
-      manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+    msg info "Installing ${name} ($cmd sh ./postfix-install -non-interactive)"
+    $cmd sh ./postfix-install -non-interactive \
+         install_root="${PREFIX}/${name}" \
+         config_directory="/conf" \
+         command_directory="/sbin" \
+         daemon_directory="/libexec" \
+         sample_directory="/sample" \
+         html_directory="/html" \
+         readme_directory="/doc" \
+         mail_owner="postfix" \
+         setgid_group="postdrop" \
+         manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  fi
 }
 
-# change ownership
+# change ownership to running user
 chown_dir()
 {
  local dir=$1
- local iam="$(whoami)"
+ local whoami="$(whoami)"
 
- chown ${iam} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership of directory ${dir}"
+ chown ${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
+}
+
+# change ownership to root
+chown_root()
+{
+ local dir=$1
+ local uid=$(id -u)
+ local cmd="chown root.root -R ${dir}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to change ownership to root on ${dir}."
+}
+
+# change ownership as root
+chown_as_root()
+{
+ local user=$1
+ local group=$2
+ local dir=$3
+ local uid=$(id -u)
+ local cmd="chown ${user}.${group} -R ${dir}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir} to ${user}.${group}."
+}
+
+# change rights as root
+chmod_as_root()
+{
+ local mode=$1
+ local dir=$2
+ local uid=$(id -u)
+ local cmd="chmod ${mode} ${dir}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to change rights on ${dir}."
+}
+
+# create directories as root
+mkdir_as_root()
+{
+ local dir=$1
+ local mode=$2
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ $cmd mkdir -p ${dir} >/dev/null 2>&1 || msg error "Failed to create directory ${dir}."
+
+ if [ -n "${mode}" ]; then
+    $cmd chmod ${mode} ${dir} >/dev/null 2>&1 || msg error "Failed to change rights on ${dir}."
+ fi
+}
+
+# copy as root
+cp_as_root()
+{
+ local source=$1
+ local destination=$2
+ local args="$3"
+ local uid=$(id -u)
+ local cmd="cp ${args} ${source} ${destination}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to copy ${source} to ${destination}."
+}
+
+# move as root
+mv_as_root()
+{
+ local source=$1
+ local destination=$2
+ local uid=$(id -u)
+ local cmd="mv ${source} ${destination}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to move ${source} to ${destination}."
+}
+
+# delete as root
+rm_as_root()
+{
+ local args=$1
+ local source=$2
+ local uid=$(id -u)
+ local cmd="rm ${args} ${source}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to deleted ${source}."
+}
+
+# create link as root
+ln_as_root()
+{
+ local source=$1
+ local destination=$2
+ local uid=$(id -u)
+ local cmd="ln -sf ${source} ${destination}"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to create link for ${source} to ${destination}."
+}
+
+# run ldconfig
+ldconfig()
+{
+ local uid=$(id -u)
+ local cmd="/sbin/ldconfig -r /"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ $cmd >/dev/null 2>&1 || msg error "Failed to run ldconfig -r /"
+}
+
+# create ldconfig file for cache
+ld_add()
+{
+ local uid=$(id -u)
+ local content=$1
+ local name=$2
+ local cmd="echo ${content} > /etc/ld.so.conf.d/${name}.conf"
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo ${cmd}"
+ fi
+
+ if [ ! -e /etc/ld.so.conf.d/${name}.conf ]; then
+    $cmd >/dev/null 2>&1 || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
+ fi
 }
 
 # strip directory
 strip_dir()
 {
  local dir=$1
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
  msg info "Stripping binaries in ${dir} ..."
  if [ -d ${dir} ]; then
-    find $dir | xargs file | grep -e "executable" -e "shared object" | grep ELF \
-       | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
+    $cmd find $dir | xargs file | grep -e "executable" -e "shared object" | grep ELF \
+           | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
  else
     msg warn "Failed to strip ${dir} ..."
  fi
@@ -369,9 +547,16 @@ strip_dir()
 strip_file()
 {
  local file=$1
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
  msg info "Stripping binary file ${file} ..."
  if [ -e ${file} ]; then
-    strip --strip-unneeded ${file} 2> /dev/null || true
+    $cmd strip --strip-unneeded ${file} 2> /dev/null || true
  else
     msg warn "Failed to strip ${file} ..."
  fi
@@ -426,9 +611,16 @@ trigger()
 stop_server()
 {
  local name=$1
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
  if [ -e /etc/init.d/${name} ]; then
      msg info "Shutting down ${name} ..."
-     sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg error "Failed to shutdown ${name}."
+     $cmd sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg error "Failed to shutdown ${name}."
  else
      msg warn "Initscript for ${name} not found."
  fi
@@ -438,9 +630,16 @@ stop_server()
 start_server()
 {
  local name=$1
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
  if [ -e /etc/init.d/${name} ]; then
      msg info "Starting up ${name} ..."
-     sh /etc/init.d/${name} start >/dev/null 2>&1 || msg error "Failed to start ${name}."
+     $cmd sh /etc/init.d/${name} start >/dev/null 2>&1 || msg error "Failed to start ${name}."
  else
      msg warn "Initscript for ${name} not found."
  fi
@@ -484,12 +683,12 @@ build_mysql()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  # cat $CWD/patch/dont-build-examples-and-tests.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
@@ -524,18 +723,20 @@ build_mysql()
  strip_dir ${PREFIX}/${name}
  create_user mysql 10101 "MySQL Server" /srv/databases/mysql
 
- [ -d ${dbdir} ] || mkdir -p -m 0770 ${dbdir}
- chown mysql.mysql ${dbdir}
- [ -d ${mylogdir} ] || mkdir -p -m 0770 ${mylogdir}
- chown mysql.mysql ${mylogdir}
+ [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
+ chown_as_root mysql mysql ${dbdir}
+ [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
+ chown_as_root mysql mysql ${mylogdir}
 
  echo "${PREFIX}/${name}/lib" > /etc/ld.so.conf.d/mysql.conf
 
- ln -sf ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
+ ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
+ ldconfig
 
- if [ -x /sbin/ldconfig ]; then
-    /sbin/ldconfig
-    sleep 1
+ if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
+    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+    cp_as_root "-f" support-files/my-small.cnf ${PREFIX}/${name}/conf/my.cnf
+    chown_root ${PREFIX}/${name}/conf
  fi
 
  if [ ! -e ${DBDATA}/${name}/mysql/db.frm ]; then
@@ -572,12 +773,12 @@ build_nginx()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -619,7 +820,7 @@ build_php()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
@@ -629,7 +830,7 @@ build_php()
  get_pkg ${url} ${tarball}
  get_patch http://download.suhosin.org suhosin-patch-5.2.16-0.9.7.patch.gz
 
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  zcat $CWD/patch/suhosin-patch-5.2.16-0.9.7.patch.gz | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
@@ -682,6 +883,13 @@ build_php()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
+ if [ ! -e ${PRERIX}/${name}/conf/php.ini ]; then
+    [ -d ${PRERIX}/${name}/conf ] || mkdir_as_root ${PRERIX}/${name}/conf
+    msg info "Copying new configuration file for php (php.ini) ..."
+    cp_as_root "-f" php.ini-recommended ${PRERIX}/${name}/conf/php.ini
+    chown_root ${PRERIX}/${name}/conf
+ fi
+
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
  fi
@@ -702,12 +910,12 @@ build_monit()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -719,8 +927,8 @@ build_monit()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- [ -d /var/run/${name} ] || mkdir -p -m 0750 /var/run/${name}
- [ -d ${PREFIX}/${name}/conf ] || mkdir -p -m 0750 ${PREFIX}/${name}/conf
+ [ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
+ [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0750
 
  cd $CWD
 }
@@ -736,7 +944,7 @@ build_eaccelerator()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  # we need to make sure php is already installed.
  need_php ${name}
@@ -744,7 +952,7 @@ build_eaccelerator()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -772,7 +980,7 @@ build_postfix()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
@@ -782,7 +990,7 @@ build_postfix()
  get_pkg ${url} ${tarball}
  get_patch http://vda.sourceforge.net/VDA postfix-vda-v10-2.8.8.patch
 
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  cat $CWD/patch/postfix-vda-v10-2.8.8.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
@@ -799,41 +1007,41 @@ build_postfix()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- [ -d ${lib} ] || mkdir -p ${lib}
- [ -d ${queue} ] || mkdir -p ${queue}
+ [ -d ${lib} ] || mkdir_as_root ${lib}
+ [ -d ${queue} ] || mkdir_as_root ${queue}
 
  for dir in active bounce corrupt defer deferred flush \
    hold incoming maildrop pid private public saved trace; do
-     mkdir -p ${queue}/${dir}
+     mkdir_as_root ${queue}/${dir}
  done
  for dir in active bounce corrupt defer deferred flush \
    hold incoming private public maildrop trace saved; do
-     chown postfix ${queue}/${dir}
+     chown_as_root postfix root ${queue}/${dir}
  done
- chgrp postdrop ${queue}/public ${queue}/maildrop
- chgrp postdrop ${PREFIX}/${name}/sbin/postqueue ${PREFIX}/${name}/sbin/postdrop
- chmod 0770 ${queue}/maildrop
- chmod g+s ${PREFIX}/${name}/sbin/postqueue ${PREFIX}/${name}/sbin/postdrop
- chown postfix ${lib}
- chmod 0755 ${lib}
+ chown_as_root root postdrop ${queue}/public ${queue}/maildrop
+ chown_as_root root postdrop ${PREFIX}/${name}/sbin/postqueue ${PREFIX}/${name}/sbin/postdrop
+ chmod_as_root 0770 ${queue}/maildrop
+ chmod_as_root g+s ${PREFIX}/${name}/sbin/postqueue ${PREFIX}/${name}/sbin/postdrop
+ chown_as_root postfix root ${lib}
+ chmod_as_root 0755 ${lib}
 
  ( cd ${PREFIX}/${name}
-   mv usr/sbin/sendmail sbin
+   mv_as_root usr/sbin/sendmail sbin
  )
- mkdir -p ${PREFIX}/${name}/bin
+ mkdir_as_root ${PREFIX}/${name}/bin
  ( cd ${PREFIX}/${name}/bin
    ln -sf ../sbin/sendmail newaliases
    ln -sf ../sbin/sendmail mailq
  )
- rm -fr ${PREFIX}/${name}/{usr,var}
+ rm_as_root "-fr" ${PREFIX}/${name}/{usr,var}
 
  for bin in ${PREFIX}/${name}/sbin/* ; do
-    ln -sf ${PREFIX}/${name}/sbin/$(basename $bin) /usr/sbin/$(basename $bin)
+    ln_as_root ${PREFIX}/${name}/sbin/$(basename $bin) /usr/sbin/$(basename $bin)
  done
- ln -sf ${PREFIX}/${name}/sbin/sendmail /usr/bin/newaliases
- ln -sf ${PREFIX}/${name}/sbin/sendmail /usr/bin/mailq
- ln -sf ${PREFIX}/${name}/sbin/sendmail /usr/lib/sendmail
- ln -sf ${PREFIX}/${name}/conf /etc/postfix
+ ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/newaliases
+ ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/mailq
+ ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/lib/sendmail
+ ln_as_root ${PREFIX}/${name}/conf /etc/postfix
 
  start_server ${name}
 
@@ -851,12 +1059,12 @@ build_greyfix()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -865,10 +1073,10 @@ build_greyfix()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- rm -fr ${PREFIX}/${name}/var
- mkdir -p /var/lib/${name}
- chown nobody -R /var/lib/${name}
- chmod 0750 /var/lib/${name}
+ rm_as_root "-fr" ${PREFIX}/${name}/var
+ mkdir_as_root /var/lib/${name}
+ chown_as_root nobody root /var/lib/${name}
+ chmod_as_root 0750 /var/lib/${name}
 
  cd $CWD
 }
@@ -884,7 +1092,7 @@ build_dovecot()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
@@ -892,7 +1100,7 @@ build_dovecot()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -924,11 +1132,11 @@ build_dovecot()
      useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/bash -r spamfilter || { msg error "Failed to create user ${user}."; exit 1; }
  fi
 
- mkdir -p ${PREFIX}/${name}/conf/${name}
- mkdir -p /var/run/${name}
- mkdir -p ${DATA}/mail/vmail
- chown -R vmail ${DATA}/mail/vmail
- chmod 0770 ${DATA}/mail/vmail
+ mkdir_as_root ${PREFIX}/${name}/conf/${name}
+ mkdir_as_root /var/run/${name}
+ mkdir_as_root ${DATA}/mail/vmail
+ chown_as_root vmail root ${DATA}/mail/vmail
+ chmod_as_root 0770 ${DATA}/mail/vmail
 
  cd $CWD
 }
@@ -944,12 +1152,12 @@ build_clamav()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -966,14 +1174,14 @@ build_clamav()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- mkdir -p -m 0755 /var/lib/${name}
- chown clamav.root /var/lib/${name} || { msg error "Failed to change /var/lib/${name} directory ownership."; exit 1; }
+ mkdir_as_root /var/lib/${name} 0755
+ chown_as_root clamav root /var/lib/${name} || { msg error "Failed to change /var/lib/${name} directory ownership."; exit 1; }
 
- mkdir -p -m 0750 /var/log/${name}
- chown clamav.root /var/log/${name} || { msg error "Failed to change /var/log/${name} directory ownership."; exit 1; }
+ mkdir_as_root /var/log/${name} 0755
+ chown_as_root clamav root /var/log/${name} || { msg error "Failed to change /var/log/${name} directory ownership."; exit 1; }
 
- mkdir -p -m 0750 ${PREFIX}/${name}/run
- chown clamav.root ${PREFIX}/${name}/run || { msg error "Failed to change ${PREFIX}/${name}/run directory ownership."; exit 1; }
+ mkdir_as_root ${PREFIX}/${name}/run 0750
+ chown_as_root clamav root ${PREFIX}/${name}/run || { msg error "Failed to change ${PREFIX}/${name}/run directory ownership."; exit 1; }
 
  cd $CWD
 }
@@ -989,12 +1197,12 @@ build_clamsmtp()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  # cat $CWD/patch/use_mkstemp.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
@@ -1004,9 +1212,9 @@ build_clamsmtp()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- mkdir -p ${PREFIX}/${name}/conf
- mkdir -p -m 0750 ${PREFIX}/${name}/run
- chown clamav ${PREFIX}/${name}/run
+ mkdir_as_root ${PREFIX}/${name}/conf
+ mkdir_as_root ${PREFIX}/${name}/run 0750
+ chown_as_root clamav root ${PREFIX}/${name}/run
 
  cd $CWD
 }
@@ -1022,7 +1230,7 @@ build_pam_mysql()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
@@ -1030,7 +1238,7 @@ build_pam_mysql()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
@@ -1057,16 +1265,16 @@ build_spf()
 
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${dir} ] && rm -fr ${dir}
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- do_unpack ${tarball}
+ unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- mkdir -p ${PREFIX}/postfix/scripts
+ mkdir_as_root ${PREFIX}/postfix/scripts
  msg info "Install ${name} in ${PREFIX}/postfix/scripts ..."
  install -m755 postfix-policyd-spf-perl \
    ${PREFIX}/postfix/scripts >/dev/null 2>&1 || { msg error "Failed to install ${name}."; exit1; }
@@ -1098,10 +1306,13 @@ control_c()
  exit $?
 }
 
+# check first if we have sudo, in case we run with normal user
+is_sudo
+
 OPT="$@"
 if [ -z "${OPT}" ]; then
-   msg error "No arguments supplied." 1>&2
    usage
+   msg error "no arguments supplied." 1>&2
    exit 1
 fi
 
@@ -1140,8 +1351,8 @@ while [ $# -gt 0 ]; do
   ;;
 
   *)
-    msg error "Missing arguments."
     usage
+    msg error "missing or wrong arguments."
     ;;
  esac
  shift
@@ -1149,13 +1360,14 @@ done
 
 if [ $buildpkg -eq 1 ]; then
    if [ -z "$name" ]; then
-      msg error "Missing arguments, can not build package."
+      usage
+      msg error "missing package name."
       exit 1
    else
       pkg=$(echo $PACKAGES | grep -w ${name} 2>/dev/null)
       if [ -z "$pkg" ]; then
-         msg error "$name package is not available at this moment."
          usage
+         msg error "$name package is not available at this moment."
          exit 1
       else
          # check if is debian/ubuntu, if not exit,
