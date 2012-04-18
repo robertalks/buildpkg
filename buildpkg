@@ -469,16 +469,15 @@ mv_as_root()
 # delete as root
 rm_as_root()
 {
- local args=$1
- local source=$2
+ local source=$1
  local uid=$(id -u)
- local cmd="rm ${args} ${source}"
+ local cmd="rm -fr ${source}"
 
  if [ $uid -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to deleted ${source}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to delete ${source}."
 }
 
 # create link as root
@@ -1036,7 +1035,7 @@ build_postfix()
    ln_as_root ../sbin/sendmail newaliases
    ln_as_root ../sbin/sendmail mailq
  )
- rm_as_root "-fr" ${PREFIX}/${name}/{usr,var}
+ rm_as_root ${PREFIX}/${name}/{usr,var}
 
  for bin in ${PREFIX}/${name}/sbin/* ; do
     ln_as_root ${PREFIX}/${name}/sbin/$(basename $bin) /usr/sbin/$(basename $bin)
@@ -1076,7 +1075,7 @@ build_greyfix()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- rm_as_root "-fr" ${PREFIX}/${name}/var
+ rm_as_root ${PREFIX}/${name}/var
  mkdir_as_root /var/lib/${name}
  chown_as_root nobody root /var/lib/${name}
  chmod_as_root 0750 /var/lib/${name}
