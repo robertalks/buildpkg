@@ -341,9 +341,9 @@ run_make()
 chown_dir()
 {
  local dir=$1
- local iam=$(whoami)
+ local iam="$(whoami)"
 
- chown ${iam} -R ${dir} >/dev/null 2>&1 || { msg error "Failed to change ownership of directory ${dir}" }
+ chown ${iam} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership of directory ${dir}"
 }
 
 # strip directory
