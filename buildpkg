@@ -310,6 +310,8 @@ run_make()
  local name=$1
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-build.log
+ local installcmd="make install"
+ local uid=$(id -u)
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile}
@@ -318,9 +320,13 @@ run_make()
  msg info "Building ${name} ( make -j${CPUs} )"
  make -j"${CPUs}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
+ if [ $uid -ne 0 ]; then
+    installcmd="sudo ${installcmd}"
+ fi
+
  if [ "${name}" != "postfix" ]; then
     msg info "Installing ${name} ( make install )"
-    make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+    ${installcmd} >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  else
     msg info "Installing ${name} ( sh ./postfix-install -non-interactive )"
     sh ./postfix-install -non-interactive \
