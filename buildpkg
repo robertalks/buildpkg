@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 NAME=buildpkg
 VERSION=1.0.0
@@ -341,17 +341,9 @@ run_make()
 chown_dir()
 {
  local dir=$1
- local uid=$(id -u)
- local cmd="chown root.root -R ${dir}"
+ local iam=$(whoami)
 
- if [ $uid -ne 0 ]; then
-   cmd="sudo $cmd"
- fi
-
- $cmd >/dev/null 2>&1
- if [ $? -ne 0 ]; then
-    msg warn "Failed to change ownership of directory ${dir}"
- fi
+ chown ${iam} -R ${dir} >/dev/null 2>&1 || { msg error "Failed to change ownership of directory ${dir}" }
 }
 
 # strip directory
