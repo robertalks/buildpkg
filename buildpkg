@@ -1030,8 +1030,8 @@ build_postfix()
  )
  mkdir_as_root ${PREFIX}/${name}/bin
  ( cd ${PREFIX}/${name}/bin
-   ln -sf ../sbin/sendmail newaliases
-   ln -sf ../sbin/sendmail mailq
+   ln_as_root ../sbin/sendmail newaliases
+   ln_as_root ../sbin/sendmail mailq
  )
  rm_as_root "-fr" ${PREFIX}/${name}/{usr,var}
 
