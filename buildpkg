@@ -139,7 +139,7 @@ is_debian()
       msg error "We can only build packages on Debian based distribution."
       exit 1
    fi
- elif [ -e /etc/debian_version ]; then
+ elif [ -s /etc/debian_version ]; then
    msg warn "Running Debian based distribution, we can continue with the build."
  else
    msg error "We can only build packages on Debian based distribution."
