@@ -748,6 +748,7 @@ build_mysql()
 
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
     [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+    msg info "Copying new configuration file for mysql (my.cnf) ..."
     cp_as_root support-files/my-small.cnf ${PREFIX}/${name}/conf/my.cnf
     chown_as_root root root ${PREFIX}/${name}/conf
  fi
