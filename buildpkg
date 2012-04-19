@@ -132,17 +132,17 @@ is_debian()
 {
  local distro=
  if [ -x /usr/bin/lsb_release ]; then
-   distro=$(/usr/bin/lsb_release -i -s 2>/dev/null)
+   distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
    if [ "$distro" == "Debian" -o "$distro" == "Ubuntu" ]; then
-      msg info "Running $distro, we can do this."
+      msg info "Running $distro, we can continue with the build."
    else
-      msg error "We can only do this on Debian or Ubuntu based distribution."
+      msg error "We can only build packages on Debian based distribution."
       exit 1
    fi
  elif [ -e /etc/debian_version ]; then
-   msg warn "We can continue, but we are running some unknown version of Debian."
+   msg warn "Running Debian based distribution, we can continue with the build."
  else
-   msg error "We can only do this on Debian or Ubuntu based distribution."
+   msg error "We can only build packages on Debian based distribution."
    exit 1
  fi
 }
