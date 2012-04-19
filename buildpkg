@@ -95,7 +95,7 @@ set_global_conf()
  else
     usage
     msg error "Unable to find a configuration file"
-    msg error "exmaple: /etc/$NAME.conf"
+    msg error "Should be: /etc/$NAME.conf or ~/$NAME.conf or ~/.$NAME.conf"
     exit 1
  fi
 
