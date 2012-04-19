@@ -124,7 +124,7 @@ set_global_conf()
     TARGET="$ARCH-linux-gnu"
  fi
 
- export PREFIX DATA MYDB TMPSRV HOST TARGET
+ export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH
 }
 
 # check if we are running Debian or Ubuntu or some derivate.
@@ -200,12 +200,10 @@ get_dependency()
  ${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
 }
 
-# set build c/c++ flags
+# set build CFLAGS/CXXFLAGS flags
 set_cflags()
 {
- local arch="$(uname -m)"
-
- if [ "${arch}" = "x86_64" ]; then
+ if [ "$ARCH" = "x86_64" ]; then
     CFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
     CXXFLAGS="$CFLAGS"
     LIBSUFFIX="64"
@@ -294,7 +292,6 @@ do_configure()
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
  if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" ]; then
-   set_cflags
    ./configure \
       --prefix="${PREFIX}/${name}" \
       --sysconfdir="${PREFIX}/${name}/conf" \
@@ -305,7 +302,6 @@ do_configure()
       --host="${TARGET}" \
       --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "nginx" ]; then
-   set_cflags
    ./configure \
       --prefix="${PREFIX}/${name}" \
       --conf-path="${PREFIX}/${name}/conf/nginx.conf" \
@@ -318,7 +314,6 @@ do_configure()
  elif [ "${name}" = "mysql" ]; then
    mkdir -p ${cwd}/build
    cd ${cwd}/build
-   set_cflags
    cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}/${name}" \
@@ -326,7 +321,6 @@ do_configure()
     -DSYSCONFDIR="${PREFIX}/${name}/conf" \
     ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "postfix" ]; then
-   set_cflags
    make makefiles \
     DEBUG="" \
     CCARGS=" \
@@ -1319,11 +1313,8 @@ control_c()
  exit $?
 }
 
-# check first if we have sudo, in case we run with normal user.
+# check first if we have sudo, in case we run with non-root user.
 is_sudo
-
-# set global variables before running anything.
-set_global_conf
 
 OPT="$@"
 if [ -z "${OPT}" ]; then
@@ -1332,6 +1323,14 @@ if [ -z "${OPT}" ]; then
    exit 1
 fi
 
+# set global variables before running anything.
+set_global_conf
+
+# set default gcc build flags CFLAGS/CXXFLAGS.
+set_cflags
+
+# buildpkg should be 0 where
+# should be 1 in case we do build all.
 buildpkg=0
 
 trap control_c SIGINT
