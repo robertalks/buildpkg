@@ -4,31 +4,21 @@ NAME=buildpkg
 VERSION=1.0.1
 CWD=$(pwd)
 
-mysqlver=5.5.23
-nginxver=1.1.18
-phpver=5.2.17
-monitver=5.3.2
-eacceleratorver=0.9.6.1
-postfixver=2.8.9
-greyfixver=0.3.9
-dovecotver=2.1.4
-spfver=2.009
-clamavver=0.97.4
-clamsmtpver=1.10
-pam_mysqlver=0.7RC1
+# Do not modify this, this are the only supported applications.
+PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql"
 
-mysqlurl="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${mysqlver}.tar.gz"
-nginxurl="http://nginx.org/download/nginx-${nginxver}.tar.gz"
-phpurl="http://www.php.net/distributions/php-${phpver}.tar.bz2"
-moniturl="http://www.mmonit.com/monit/dist/monit-${monitver}.tar.gz"
-eacceleratorurl="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${eacceleratorver}.tar.bz2"
-postfixurl="http://postfix.ezarticleinformation.com/official/postfix-${postfixver}.tar.gz"
-greyfixurl="http://www.kim-minh.com/pub/greyfix/greyfix-${greyfixver}.tar.gz"
-dovecoturl="http://dovecot.org/releases/2.1/dovecot-${dovecotver}.tar.gz"
-spfurl="https://launchpad.net/postfix-policyd-spf-perl/trunk/${spfver}/+download/postfix-policyd-spf-perl-${spfver}.tar.gz"
-clamavurl="http://downloads.sourceforge.net/project/clamav/clamav/${clamavver}/clamav-${clamavver}.tar.gz"
-clamsmtpurl="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${clamsmtpver}.tar.gz"
-pam_mysqlurl="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${pam_mysqlver}/pam_mysql-${pam_mysqlver}.tar.gz"
+MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
+NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
+PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
+MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
+EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
+POSTFIX_URL="http://postfix.ezarticleinformation.com/official/postfix-${POSTFIX_VERSION}.tar.gz"
+GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
+DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
+SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
+CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
+CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
+PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libcurl3-gnutls"
@@ -46,8 +36,6 @@ dovecotdeps="build-essential intltool libtool libdb-dev libdb4.8-dev libldap2-de
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
-
-PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql"
 
 export buildall=0
 export triggeroff=0
@@ -104,6 +92,11 @@ set_global_conf()
     source $CWD/buildpkg.conf
  elif [ -s $CWD/.buildpkg.conf ]; then
     source $CWD/.buildpkg.conf
+ else
+    usage
+    msg error "Unable to find a configuration file"
+    msg error "exmaple: /etc/$NAME.conf"
+    exit 1
  fi
 
  [ -z "$PREFIX" ] && PREFIX=/appls
@@ -125,6 +118,22 @@ set_global_conf()
  fi
 
  export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH
+
+ # This should not be touched.
+ # We need the proper versions of the applications which we wanna build.
+ export \
+ MYSQL_VERSION \
+ NGINX_VERSION \
+ PHP_VERSION \
+ EACCELERATOR_VERSION \
+ MONIT_VERSION \
+ POSTFIX_VERSION \
+ GREYFIX_VERSION \
+ DOVECOT_VERSION \
+ SPF_VERSION \
+ CLAMAV_VERSION \
+ CLAMSMTP_VERSION \
+ PAM_MYSQL_VERSION
 }
 
 # check if we are running Debian or Ubuntu or some derivate.
@@ -685,10 +694,10 @@ need_php()
 build_mysql()
 {
  local name="mysql"
- local version="${mysqlver}"
+ local version="${MYSQL_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${mysqlurl}"
+ local url="${MYSQL_URL}"
  local mylogdir="${MYDB}/log"
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
@@ -780,10 +789,10 @@ build_mysql()
 build_nginx()
 {
  local name="nginx"
- local version="${nginxver}"
+ local version="${NGINX_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${nginxurl}"
+ local url="${NGINX_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -827,10 +836,10 @@ build_nginx()
 build_php()
 {
  local name="php"
- local version="${phpver}"
+ local version="${PHP_VERSION}"
  local tarball="${name}-${version}.tar.bz2"
  local dir="${name}-${version}"
- local url="${phpurl}"
+ local url="${PHP_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -917,10 +926,10 @@ build_php()
 build_monit()
 {
  local name="monit"
- local version="${monitver}"
+ local version="${MONIT_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${moniturl}"
+ local url="${MONIT_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -951,10 +960,10 @@ build_monit()
 build_eaccelerator()
 {
  local name="eaccelerator"
- local version="${eacceleratorver}"
+ local version="${EACCELERATOR_VERSION}"
  local tarball="${name}-${version}.tar.bz2"
  local dir="${name}-${version}"
- local url="${eacceleratorurl}"
+ local url="${EACCELERATOR_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -985,10 +994,10 @@ build_eaccelerator()
 build_postfix()
 {
  local name="postfix"
- local version="${postfixver}"
+ local version="${POSTFIX_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${postfixurl}"
+ local url="${POSTFIX_URL}"
  local queue="/var/spool/${name}"
  local lib="/var/lib/${name}"
 
@@ -1066,10 +1075,10 @@ build_postfix()
 build_greyfix()
 {
  local name="greyfix"
- local version="${greyfixver}"
+ local version="${GREYFIX_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${greyfixurl}"
+ local url="${GREYFIX_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1099,10 +1108,10 @@ build_greyfix()
 build_dovecot()
 {
  local name="dovecot"
- local version="${dovecotver}"
+ local version="${DOVECOT_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${dovecoturl}"
+ local url="${DOVECOT_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1159,10 +1168,10 @@ build_dovecot()
 build_clamav()
 {
  local name="clamav"
- local version="${clamavver}"
+ local version="${CLAMAV_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${clamavurl}"
+ local url="${CLAMAV_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1204,10 +1213,10 @@ build_clamav()
 build_clamsmtp()
 {
  local name="clamsmtp"
- local version="${clamsmtpver}"
+ local version="${CLAMSMTP_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${clamsmtpurl}"
+ local url="${CLAMSMTP_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1237,10 +1246,10 @@ build_clamsmtp()
 build_pam_mysql()
 {
  local name="pam_mysql"
- local version="${pam_mysqlver}"
+ local version="${PAM_MYSQL_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${pam_mysqlurl}"
+ local url="${PAM_MYSQL_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1272,10 +1281,10 @@ build_pam_mysql()
 build_spf()
 {
  local name="postfix-policyd-spf-perl"
- local version="${spfver}"
+ local version="${SPF_VERSION}"
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
- local url="${spfurl}"
+ local url="${SPF_URL}"
 
  [ -d build ] || mkdir -p build
  cd build
