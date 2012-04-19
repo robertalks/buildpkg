@@ -94,8 +94,8 @@ set_global_conf()
     source $CWD/.buildpkg.conf
  else
     usage
-    msg error "Unable to find a configuration file"
-    msg error "Should be: /etc/$NAME.conf or ~/$NAME.conf or ~/.$NAME.conf"
+    msg error "unable to find a configuration file."
+    msg error "im looking for: /etc/$NAME.conf or ~/$NAME.conf or ~/.$NAME.conf"
     exit 1
  fi
 
