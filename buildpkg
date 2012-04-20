@@ -103,7 +103,7 @@ set_global_conf()
  [ -z "$DATA" ] && DATA=/srv
  [ -z "$MYDB" ] && MYDB=/srv/databases
  [ -z "$TMPSRV" ] && TMPSRV=/var/webservice
- [ -z "$HOST" ] && HOST=$(hostname -f)
+ [ -z "$HOST" ] && HOST="$(hostname -f)"
 
  if [ "$(uname -m)" = "x86_64" ]; then
     ARCH="x86_64"
