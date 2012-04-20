@@ -7,19 +7,6 @@ CWD=$(pwd)
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql"
 
-MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
-NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
-PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
-MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
-EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
-POSTFIX_URL="http://postfix.ezarticleinformation.com/official/postfix-${POSTFIX_VERSION}.tar.gz"
-GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
-DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
-SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
-CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
-CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
-PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
-
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
@@ -123,6 +110,19 @@ set_global_conf()
  [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
+ MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
+ NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
+ PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
+ EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
+ MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
+ POSTFIX_URL="http://postfix.ezarticleinformation.com/official/postfix-${POSTFIX_VERSION}.tar.gz"
+ GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
+ DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
+ SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
+ CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
+ CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
+ PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
+
  if [ "$(uname -m)" = "x86_64" ]; then
     ARCH="x86_64"
  else
@@ -152,6 +152,19 @@ set_global_conf()
  CLAMAV_VERSION \
  CLAMSMTP_VERSION \
  PAM_MYSQL_VERSION
+ export \
+ MYSQL_URL \
+ NGINX_URL \
+ PHP_URL \
+ EACCELERATOR_URL \
+ MONIT_URL \
+ POSTFIX_URL \
+ GREYFIX_URL \
+ DOVECOT_URL \
+ SPF_URL \
+ CLAMAV_URL \
+ CLAMSMTP_URL \
+ PAM_MYSQL_URL
 }
 
 # check if we are running Debian or Ubuntu or some derivate.
@@ -869,12 +882,12 @@ build_php()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- get_patch http://download.suhosin.org suhosin-patch-5.2.16-0.9.7.patch.gz
+ get_patch http://download.suhosin.org suhosin-patch-5.3.9-0.9.10.patch.gz
 
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- zcat $CWD/patch/suhosin-patch-5.2.16-0.9.7.patch.gz | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ zcat $CWD/patch/suhosin-patch-5.3.9-0.9.10.patch.gz | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
 
  do_configure ${name} \
  "--enable-inline-optimization \
