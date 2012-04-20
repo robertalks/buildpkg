@@ -12,14 +12,14 @@ nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev 
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
 libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
-libdb-dev libdb4.8-dev libcurl4-openssl-dev libcurl3 libbz2-dev \
-libc-client2007e-dev libevent-dev libexpat1-dev libjpeg62-dev libxslt1-dev \
+libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
+libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev \
 libkrb5-dev libldap2-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
 libsasl2-dev libtidy-dev re2c zlib1g-dev patch bzip2"
 monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev"
-postfixdeps="build-essential intltool libdb-dev libdb4.8-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
-greyfixdeps="build-essential intltool libdb-dev libdb4.8-dev zlib1g-dev"
-dovecotdeps="build-essential intltool libtool libdb-dev libdb4.8-dev libldap2-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev"
+postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev patch"
+greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
+dovecotdeps="build-essential intltool libtool libdb-dev libldap2-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev"
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
@@ -115,7 +115,7 @@ set_global_conf()
  PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
  EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
- POSTFIX_URL="http://postfix.ezarticleinformation.com/official/postfix-${POSTFIX_VERSION}.tar.gz"
+ POSTFIX_URL="ftp://ftp.its.cz/MIRRORS/ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
  DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
  SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
@@ -1290,8 +1290,6 @@ build_pam_mysql()
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
-
- get_dependency ${name}
 
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
