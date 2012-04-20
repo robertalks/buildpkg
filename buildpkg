@@ -7,7 +7,7 @@ CWD=$(pwd)
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql"
 
-mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch"
+mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch libssl-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
@@ -123,6 +123,9 @@ set_global_conf()
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
 
+ if [ -z "$MAKEJOBS" ]; then
+    MAKEJOBS="$(grep MHz /proc/cpuinfo 2>/dev/null | wc -l)"
+ fi
  if [ "$(uname -m)" = "x86_64" ]; then
     ARCH="x86_64"
  else
@@ -135,10 +138,10 @@ set_global_conf()
     TARGET="$ARCH-linux-gnu"
  fi
 
- export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH
+ export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS
 
  # This should not be touched.
- # We need the proper versions of the applications which we wanna build.
+ # We need the proper versions of the applications which we want to build.
  export \
  MYSQL_VERSION \
  NGINX_VERSION \
@@ -391,7 +394,6 @@ do_configure()
 # make and install package
 run_make()
 {
- local CPUs=$(grep MHz /proc/cpuinfo | wc -l)
  local name=$1
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-build.log
@@ -401,9 +403,9 @@ run_make()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- msg info "Building ${name} (make -j${CPUs})"
+ msg info "Building ${name} (make -j${MAKEJOBS})"
  msg info "Logfile saved in ${logfile}"
- make -j"${CPUs}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+ make -j"${MAKEJOBS}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
  if [ $uid -ne 0 ]; then
     cmd="sudo"
@@ -415,16 +417,16 @@ run_make()
  else
     msg info "Installing ${name} ($cmd sh ./postfix-install -non-interactive)"
     $cmd sh ./postfix-install -non-interactive \
-         install_root="${PREFIX}/${name}" \
-         config_directory="/conf" \
-         command_directory="/sbin" \
-         daemon_directory="/libexec" \
-         sample_directory="/sample" \
-         html_directory="/html" \
-         readme_directory="/doc" \
-         mail_owner="postfix" \
-         setgid_group="postdrop" \
-         manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+       install_root="${PREFIX}/${name}" \
+       config_directory="/conf" \
+       command_directory="/sbin" \
+       daemon_directory="/libexec" \
+       sample_directory="/sample" \
+       html_directory="/html" \
+       readme_directory="/doc" \
+       mail_owner="postfix" \
+       setgid_group="postdrop" \
+       manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  fi
 }
 
