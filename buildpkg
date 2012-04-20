@@ -891,12 +891,12 @@ build_php()
 
  do_configure ${name} \
  "--enable-inline-optimization \
-  --enable-discard-path \
-  --enable-fastcgi \
-  --enable-force-cgi-redirect \
   --enable-sqlite-utf8 \
   --enable-bcmath \
   --enable-calendar \
+  --enable-fpm \
+  --with-fpm-user=www \
+  --with-fpm-group=www \
   --with-curl \
   --enable-exif \
   --enable-ftp \
@@ -937,11 +937,11 @@ build_php()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- if [ ! -e ${PRERIX}/${name}/conf/php.ini ]; then
-    [ -d ${PRERIX}/${name}/conf ] || mkdir_as_root ${PRERIX}/${name}/conf
+ if [ ! -e ${PREFIX}/${name}/conf/php.ini ]; then
+    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
     msg info "Copying new configuration file for php (php.ini) ..."
-    cp_as_root php.ini-recommended ${PRERIX}/${name}/conf/php.ini
-    chown_as_root root root ${PRERIX}/${name}/conf
+    cp_as_root php.ini-production ${PREFIX}/${name}/conf/php.ini
+    chown_as_root root root ${PREFIX}/${name}/conf
  fi
 
  if [ ${buildall} -eq 0 ]; then
