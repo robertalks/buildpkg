@@ -259,9 +259,6 @@ set_cflags()
     LIBSUFFIX=""
  fi
 
- msg info "Running $ARCH architecture, using compiler flags:"
- msg info " * CFLAGS: $CFLAGS"
- msg info " * CXXFLAGS: $CXXFLAGS"
  export CFLAGS CXXFLAGS LIBSUFFIX
 }
 
@@ -335,6 +332,10 @@ do_configure()
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
+
+ msg info "Running $ARCH architecture, using compiler flags:"
+ msg info " * CFLAGS: $CFLAGS"
+ msg info " * CXXFLAGS: $CXXFLAGS"
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
