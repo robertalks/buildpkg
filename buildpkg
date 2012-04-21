@@ -336,9 +336,6 @@ do_configure()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- # set default gcc build flags CFLAGS/CXXFLAGS.
- set_cflags
-
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
  if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" ]; then
@@ -1372,6 +1369,9 @@ fi
 
 # set global variables before running anything.
 set_global_conf
+
+# set default gcc build flags CFLAGS/CXXFLAGS.
+set_cflags
 
 # buildpkg should be 0 where
 # should be 1 in case we do build all.
