@@ -60,13 +60,13 @@ msg()
  local message=$2
  case "$type" in
    info)
-    echo "msg() info: $message" ;;
+    echo "$NAME: info: $message" ;;
    warn)
-    echo "msg() warn: $message" ;;
+    echo "$NAME: warn: $message" ;;
    error)
-    echo "msg() error: $message" ;;
+    echo "$NAME: error: $message" ;;
    *)
-    echo 'msg(): missing arguments, usage: "error some message"' ;;
+    echo '$NAME: missing arguments, usage: "error some message"' ;;
  esac
 }
 
@@ -403,7 +403,7 @@ run_make()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- msg info "Building ${name} (make -j${MAKEJOBS})"
+ msg info "Compiling ${name} source (make -j${MAKEJOBS})"
  msg info "Logfile saved in ${logfile}"
  make -j"${MAKEJOBS}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
@@ -412,10 +412,10 @@ run_make()
  fi
 
  if [ "${name}" != "postfix" ]; then
-    msg info "Installing ${name} ($cmd make install)"
+    msg info "Installing ${name} from compiled source ($cmd make install)"
     $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  else
-    msg info "Installing ${name} ($cmd sh ./postfix-install -non-interactive)"
+    msg info "Installing ${name} from compiled source ($cmd sh ./postfix-install -non-interactive)"
     $cmd sh ./postfix-install -non-interactive \
        install_root="${PREFIX}/${name}" \
        config_directory="/conf" \
