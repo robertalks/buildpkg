@@ -16,7 +16,7 @@ DAEMON_OPTS="-d"
 USER=clamav
 NAME=clamav-freshclam
 DESC=clamav-freshclam
-PIDFILE=/appls/clamav/run/$NAME.pid
+PIDFILE=${prefix}/run/$NAME.pid
 
 PATH=${prefix}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 test -x $DAEMON || exit 0

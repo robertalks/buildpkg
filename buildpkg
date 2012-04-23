@@ -401,7 +401,6 @@ do_configure()
    cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}/${name}" \
-    -DINSTALL_MYSQLDATADIR="${MYDB}/${name}" \
     -DSYSCONFDIR="${PREFIX}/${name}/conf" \
     ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "postfix" ]; then
@@ -697,7 +696,7 @@ trigger()
 }
 
 # stop server/service
-stop_server()
+stop_service()
 {
  local name=$1
  local uid=$(id -u)
@@ -716,7 +715,7 @@ stop_server()
 }
 
 # start server/service
-start_server()
+start_service()
 {
  local name=$1
  local uid=$(id -u)
@@ -808,24 +807,27 @@ build_mysql()
   -DWITH_ZLIB=system \
   -DWITH_SSL=system \
   -DWITH_LIBWRAP=OFF \
-  -DMYSQL_DATADIR=${MYDB}/${name} \
+  -DINSTALL_MYSQLDATADIR=${dbdir} \
+  -DMYSQL_DATADIR=${dbdir} \
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock \
   -DFEATURE_SET=community \
   -DCOMPILATION_COMMENT='MySQL Community Server' \
   -DMANUFACTURER=$HOST"
 
+ stop_service mysql
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
- create_user mysql 10101 "MySQL Server" /srv/databases/mysql
+ create_user mysql 10101 "MySQL Server" ${dbdir}
 
  [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
  chown_as_root mysql mysql ${dbdir}
  [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
  chown_as_root mysql mysql ${mylogdir}
 
- echo "${PREFIX}/${name}/lib" > /etc/ld.so.conf.d/mysql.conf
-
  ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
+
+ ld_add "${PREFIX}/${name}/lib" ${name}
  ldconfig
 
  mkdir_as_root $TMPSRV 0777
@@ -839,22 +841,35 @@ build_mysql()
     [ -e ${PREFIX}/${name}/conf/my.cnf ] && \
     $cmd sed -i \
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-      -e "s|@@MYDB@@|${MYDB}|g" \
+      -e "s|@@MYDB@@|${dbdir}|g" \
       ${PREFIX}/${name}/conf/my.cnf
  fi
+ if [ ! -e /etc/init.d/mysql ]; then
+    msg info "Copying start/stop script for $name (/etc/init.d/mysql) ..."
+    cp_as_root $CWD/scripts/mysql /etc/init.d/mysql
+    chown_as_root root root /etc/init.d/mysql
+    chmod_as_root 0755 /etc/init.d/mysql
+    [ -e /etc/init.d/mysql ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@MYDB@@|${dbdir}|g" \
+      /etc/init.d/mysql
+ fi
 
- if [ ! -e ${MYDB}/${name}/mysql/db.frm ]; then
+ if [ ! -e ${dbdir}/mysql/db.frm ]; then
     [ -e ${db_install_log} ] && rm -f ${db_install_log}
     export PATH="${PREFIX}/${name}/bin:$PATH"
-    msg info "Installing MySQL database in ${MYDB}/${name} ..."
+    msg info "Installing MySQL database in ${dbdir} ..."
     msg warn "*** (for more information please check ${db_install_log}) ***"
     $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
       --basedir=${PREFIX}/${name} \
-      --datadir=${MYDB}/${name} \
+      --datadir=${dbdir} \
       --user=mysql > ${db_install_log}
  else
    msg info "MySQL database found, we wont do nothing."
  fi
+
+ start_service mysql
 
  if [ ${buildall} -eq 0 ]; then
     trigger pam_mysql
@@ -991,7 +1006,7 @@ build_php()
   --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
   --with-pdo-mysql=${PREFIX}/mysql"
 
- stop_server php-fpm
+ stop_service php-fpm
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
@@ -1031,7 +1046,7 @@ build_php()
     trigger eaccelerator
  fi
 
- start_server php-fpm
+ start_service php-fpm
 
  cd $CWD
 }
@@ -1139,7 +1154,7 @@ build_postfix()
  fi
  create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
 
- stop_server ${name}
+ stop_service ${name}
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
@@ -1180,7 +1195,7 @@ build_postfix()
  ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/lib/sendmail
  ln_as_root ${PREFIX}/${name}/conf /etc/postfix
 
- start_server ${name}
+ start_service ${name}
 
  cd $CWD
 }
@@ -1314,6 +1329,9 @@ build_clamav()
   --program-prefix= \
   --program-suffix="
 
+ stop_service ${name}-freshclam
+ stop_service ${name}-clamd
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
@@ -1338,7 +1356,7 @@ build_clamav()
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/clamd.conf
  fi
- if [ ! ${PREFIX}/${name}/conf/freshclam.conf ]; then
+ if [ ! -e ${PREFIX}/${name}/conf/freshclam.conf ]; then
     msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
     cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && \
@@ -1347,6 +1365,30 @@ build_clamav()
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/freshclam.conf
  fi
+
+ if [ ! -e /etc/init.d/${name}-clamd ]; then
+    msg info "Copying start/stop script for $name (/etc/init.d/${name}-clamd) ..."
+    cp_as_root $CWD/scripts/${name}-clamd /etc/init.d/${name}-clamd
+    chown_as_root root root /etc/init.d/${name}-clamd
+    chmod_as_root 0755 /etc/init.d/${name}-clamd
+    [ -e /etc/init.d/${name}-clamd ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      /etc/init.d/${name}-clamd
+ fi
+ if [ ! -e /etc/init.d/${name}-freshclam ]; then
+    msg info "Copying start/stop script for $name (/etc/init.d/${name}-freshclam) ..."
+    cp_as_root $CWD/scripts/${name}-freshclam /etc/init.d/${name}-freshclam
+    chown_as_root root root /etc/init.d/${name}-freshclam
+    chmod_as_root 0755 /etc/init.d/${name}-freshclam
+    [ -e /etc/init.d/${name}-freshclam ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      /etc/init.d/${name}-freshclam
+ fi
+
+ start_service ${name}-clamd
+ start_service ${name}-freshclam
 
  cd $CWD
 }

@@ -15,7 +15,7 @@ DAEMON=${prefix}/sbin/clamd
 USER=clamav
 NAME=clamav-clamd
 DESC=clamav-clamd
-PIDFILE=/appls/clamav/run/$NAME.pid
+PIDFILE=${prefix}/run/$NAME.pid
 
 PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 test -x $DAEMON || exit 0
