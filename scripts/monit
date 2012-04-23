@@ -1,0 +1,78 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          monit
+# Required-Start:    $remote_fs nginx php-fastcgi mysql clamav-clamd dovecot postfix sshd
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: service and resource monitoring daemon
+### END INIT INFO
+
+prefix=@@PREFIX@@
+DAEMON=${prefix}/bin/monit
+CONFIG=${prefix}/conf/monitrc
+ARGS="-c ${CONFIG} -s /var/run/monit/monit.state"
+NAME=monit
+DESC=monit
+
+PATH=${prefix}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+test -f $DAEMON || exit 0
+set -e
+
+. /lib/lsb/init-functions
+
+monit_check_config () {
+    # Check for emtpy config, probably default configfile.
+    if [ "`grep -s -v \"^#\" $CONFIG`" = "" ]; then
+        echo " empty config, please edit $CONFIG."
+        exit 0
+    fi
+}
+
+monit_checks () {
+ monit_check_config
+ $DAEMON -t
+ /bin/chmod go-rwx $CONFIG
+ [ -d /var/run/monit ] || mkdir -p -m 0750 /var/run/monit
+}
+
+case "$1" in
+  start)
+   log_daemon_msg "Starting monit" "$DESC"
+   monit_checks $1
+   start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
+          --exec $DAEMON > /dev/null 2>&1 -- $ARGS
+   if [ $? -eq 0 ]; then
+      log_end_msg 0
+   else
+      log_end_msg 1
+   fi
+  ;;
+  stop)
+   log_daemon_msg "Stopping monit" "$DESC"
+   start-stop-daemon --retry 5 --oknodo --stop --quiet --pidfile /var/run/$NAME.pid \
+          --exec $DAEMON  > /dev/null 2>&1
+   if [ $? -eq 0 ]; then
+      log_end_msg 0
+   else
+      log_end_msg 1
+   fi
+   rm -f /var/run/monit/monit.state
+  ;;
+  restart|force-reload)
+   $0 stop
+   sleep 3
+   $0 start
+  ;;
+  syntax)
+   monit_check_syntax
+  ;;
+  *)
+   N=/etc/init.d/$NAME
+   echo "Usage: $N {start|stop|restart|force-reload|syntax}" >&2
+   exit 1
+  ;;
+esac
+
+exit 0

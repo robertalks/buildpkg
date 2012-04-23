@@ -1,0 +1,80 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          dovecot
+# Required-Start:    $local_fs $remote_fs $network $syslog mysql
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Dovecot init script
+# Description:       Init script for dovecot daemon
+### END INIT INFO
+
+prefix=@@PREFIX@@
+DAEMON=${prefix}/sbin/dovecot
+NAME="dovecot"
+DESC="dovecot"
+
+PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+test -x $DAEMON || exit 0
+set -e
+
+base_dir="$($DAEMON config -h base_dir)"
+pidfile="${base_dir}/master.pid"
+
+. /lib/lsb/init-functions
+
+if test -f $pidfile; then
+  running=yes
+else
+  running=no
+fi
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting Dovecot" "$NAME"
+    $DAEMON
+    if [ $? -eq 0 ]; then
+	log_end_msg 0
+    else
+	log_end_msg 1
+    fi
+    ;;
+  stop)
+    if test $running = yes; then
+      log_daemon_msg "Stopping Dovecot" "$NAME"
+      kill `cat $pidfile`
+      log_end_msg 0
+    else
+      log_end_msg 1
+    fi
+    ;;
+  reload)
+    if test $running = yes; then
+      log_daemon_msg "Reloading Dovecot configuration" "$NAME"
+      kill -HUP `cat $pidfile`
+      log_end_msg 0
+    else
+      log_end_msg 1
+    fi
+    ;;
+  restart|force-reload)
+    log_daemon_msg "Restarting Dovecot" "$NAME"
+    if test $running = yes; then
+      kill `cat $pidfile`
+      sleep 1
+    fi
+    $DAEMON
+    if [ $? -eq 0 ]; then
+        log_end_msg 0
+    else
+        log_end_msg 1
+    fi
+    ;;
+  *)
+    echo "Usage: /etc/init.d/$NAME {start|stop|reload|restart|force-reload}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

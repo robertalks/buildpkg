@@ -769,6 +769,12 @@ build_mysql()
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
  local dbdir="${MYDB}/${name}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
 
  [ -d build ] || mkdir -p build
  cd build
@@ -780,7 +786,7 @@ build_mysql()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/dont-build-examples-and-tests.patch 1
+ apply_patch $CWD/patches/dont-build-examples-and-tests.patch.gz 1
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -822,11 +828,19 @@ build_mysql()
  ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
  ldconfig
 
+ mkdir_as_root $TMPSRV 0777
+ chown_as_root root root $TMPSRV
+
+ [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
-    msg info "Copying new configuration file for mysql (my.cnf) ..."
-    cp_as_root support-files/my-small.cnf ${PREFIX}/${name}/conf/my.cnf
+    msg info "Copying new configuration file for $name (my.cnf) ..."
+    cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
     chown_as_root root root ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/my.cnf ] && \
+    $cmd sed -i \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      -e "s|@@MYDB@@|${MYDB}|g" \
+      ${PREFIX}/${name}/conf/my.cnf
  fi
 
  if [ ! -e ${MYDB}/${name}/mysql/db.frm ]; then
@@ -834,7 +848,7 @@ build_mysql()
     export PATH="${PREFIX}/${name}/bin:$PATH"
     msg info "Installing MySQL database in ${MYDB}/${name} ..."
     msg warn "*** (for more information please check ${db_install_log}) ***"
-    ${PREFIX}/${name}/scripts/mysql_install_db \
+    $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
       --basedir=${PREFIX}/${name} \
       --datadir=${MYDB}/${name} \
       --user=mysql > ${db_install_log}
@@ -896,6 +910,9 @@ build_nginx()
  strip_dir ${PREFIX}/${name}
  create_user www 10100 "Nginx Web Server" /srv/www
 
+ mkdir_as_root /var/log/nginx 0770
+ chown_as_root www root /var/log/nginx
+
  cd $CWD
 }
 
@@ -907,6 +924,12 @@ build_php()
  local tarball="${name}-${version}.tar.bz2"
  local dir="${name}-${version}"
  local url="${PHP_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
 
  [ -d build ] || mkdir -p build
  cd build
@@ -968,23 +991,47 @@ build_php()
   --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
   --with-pdo-mysql=${PREFIX}/mysql"
 
- stop_server php-fastcgi
+ stop_server php-fpm
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
+ mkdir_as_root /var/log/nginx 0770
+ chown_as_root www root /var/log/nginx
+
+ [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
  if [ ! -e ${PREFIX}/${name}/conf/php.ini ]; then
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
-    msg info "Copying new configuration file for php (php.ini) ..."
+    msg info "Copying new configuration file for $name (php.ini) ..."
     cp_as_root php.ini-production ${PREFIX}/${name}/conf/php.ini
     chown_as_root root root ${PREFIX}/${name}/conf
+ fi
+ if [ ! -e ${PREFIX}/${name}/conf/php-fpm.conf ]; then
+    msg info "Copying new configuration file for $name (php-fpm.conf) ..."
+    cp_as_root $CWD/config.d/php-fpm.conf ${PREFIX}/${name}/conf/php-fpm.conf
+    chown_as_root root root ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/php-fpm.conf ] && \
+    $cmd sed -i
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      ${PREFIX}/${name}/conf/php-fpm.conf
+ fi
+
+ if [ ! -e /etc/init.d/php-fpm ]; then
+    msg info "Copying start/stop script for $name (/etc/init.d/php-fpm) ..."
+    cp_as_root $CWD/scripts/php-fpm /etc/init.d/php-fpm
+    chown_as_root root root /etc/init.d/php-fpm
+    chmod_as_root 0755 /etc/init.d/php-fpm
+    [ -e /etc/init.d/php-fpm ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      /etc/init.d/php-fpm
  fi
 
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
  fi
 
- start_server php-fastcgi
+ start_server php-fpm
 
  cd $CWD
 }
@@ -1239,6 +1286,12 @@ build_clamav()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${CLAMAV_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1265,13 +1318,35 @@ build_clamav()
  strip_dir ${PREFIX}/${name}
 
  mkdir_as_root /var/lib/${name} 0755
- chown_as_root clamav root /var/lib/${name} || { msg error "Failed to change /var/lib/${name} directory ownership."; exit 1; }
+ chown_as_root clamav root /var/lib/${name}
 
  mkdir_as_root /var/log/${name} 0755
- chown_as_root clamav root /var/log/${name} || { msg error "Failed to change /var/log/${name} directory ownership."; exit 1; }
+ chown_as_root clamav root /var/log/${name}
 
  mkdir_as_root ${PREFIX}/${name}/run 0750
- chown_as_root clamav root ${PREFIX}/${name}/run || { msg error "Failed to change ${PREFIX}/${name}/run directory ownership."; exit 1; }
+ chown_as_root clamav root ${PREFIX}/${name}/run
+
+ mkdir_as_root $TMPSRV 0777
+ chown_as_root root root $TMPSRV
+
+ if [ ! -e ${PREFIX}/${name}/conf/clamd.conf ]; then
+    msg info "Copying new configuration file for ${name} (clamd.conf) ..."
+    cp_as_root $CWD/config.d/clamd.conf  ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/clamd.conf ] && \
+    $cmd sed -i
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/${name}/conf/clamd.conf
+ fi
+ if [ ! ${PREFIX}/${name}/conf/freshclam.conf ]; then
+    msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
+    cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && \
+    $cmd sed -i
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/${name}/conf/freshclam.conf
+ fi
 
  cd $CWD
 }
@@ -1295,7 +1370,7 @@ build_clamsmtp()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/use_mkstemp.patch 1
+ apply_patch $CWD/patches/use_mkstemp.patch.gz 1
 
  do_configure ${name} "--disable-dependency-tracking"
 
