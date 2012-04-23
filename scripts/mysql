@@ -40,6 +40,7 @@ fi
 datadir_set=@@MYDB@@/mysql
 
 lsb_functions="/lib/lsb/init-functions"
+
 if test -f $lsb_functions ; then
   . $lsb_functions
 else
@@ -53,13 +54,12 @@ else
   }
 fi
 
-PATH="$basedir/bin:/sbin:/usr/sbin:/bin:/usr/bin"
-export PATH
+PATH=${basedir}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+set -e
 
 mode=$1    # start or stop
 
 [ $# -ge 1 ] && shift
-
 
 other_args="$*"
 

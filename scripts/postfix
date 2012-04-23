@@ -10,13 +10,13 @@
 # Description:       starts postfix using start-stop-daemon
 ### END INIT INFO
 
-PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=@@DAEMON@@
+prefix=@@PREFIX@@
+DAEMON=${prefix}/sbin/postfix
 pidfile=/var/spool/postfix/pid/master.pid
 NAME=postfix
 
+PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 test -x $DAEMON || exit 0
-
 set -e
 
 . /lib/lsb/init-functions
