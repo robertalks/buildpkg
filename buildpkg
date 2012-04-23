@@ -123,8 +123,8 @@ set_global_conf()
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
 
- if [ -z "$MAKEJOBS" ]; then
-    MAKEJOBS="$(grep MHz /proc/cpuinfo 2>/dev/null | wc -l)"
+ if [[ -z "$MAKEJOBS" ]] || [[ $MAKEJOBS -eq 0 ]]; then
+    MAKEJOBS="$(grep -wc MHz /proc/cpuinfo 2>/dev/null)"
  fi
  if [ "$(uname -m)" = "x86_64" ]; then
     ARCH="x86_64"
@@ -304,7 +304,7 @@ get_patch()
 {
  local url=$1
  local patchname=$2
- local patchdir="$CWD/patch"
+ local patchdir="$CWD/patches"
  local patchfile="${patchdir}/${patchname}"
 
  [ -d ${patchdir} ] || mkdir -p ${patchdir}
@@ -318,6 +318,42 @@ get_patch()
     /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${patchfile}" "${url}/${patchname}" || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
  else
    msg warn "Patch file ${patchname} already exists."
+ fi
+}
+
+# apply patch
+apply_patch()
+{
+ local patch_file=$1
+ local strip=$2
+ local logdir=$CWD/log
+ local logfile=${logdir}/${name}-patches.log
+ local cmd=
+
+ if [ -s ${patch_file} ]; then
+    if [ $(file ${patch_file} |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
+       cmd=cat
+    elif [ $(file ${patch_file} |grep -qw gzip >/dev/null 2>&1; echo $?) -eq 0 ]; then
+       cmd=zcat
+    elif [ $(file ${patch_file} |grep -qw bzip2 >/dev/null 2>&1; echo $?) -eq 0 ]; then
+       cmd=bzcat
+    else
+       msg warn "unable to determine patch file type."
+       msg warn "patch ${patch_file} not applied."
+    fi
+    if [ "$cmd" != "" ]; then
+       [ -d ${logdir} ] || mkdir -p ${logdir}
+       [ -e ${logfile} ] && rm -f ${logfile} || :
+       msg info "Applying patch file ${patch_file} with strip option -p${strip}."
+       msg info "Logfile saved in ${logfile}"
+       $cmd ${patch_file} | patch -p${strip} > ${logfile} 2>&1
+       if [ $? -ne 0 ]; then
+          msg error "unable to apply patch ${patch_file}."
+          exit $?
+       fi
+    fi
+ else
+    msg warn "patch ${patch_file} not available or broken."
  fi
 }
 
@@ -744,7 +780,7 @@ build_mysql()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- # cat $CWD/patch/dont-build-examples-and-tests.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ apply_patch $CWD/patches/dont-build-examples-and-tests.patch 1
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -887,7 +923,7 @@ build_php()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- zcat $CWD/patch/suhosin-patch-5.3.9-0.9.10.patch.gz | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ apply_patch $CWD/patches/suhosin-patch-5.3.9-0.9.10.patch.gz 1
 
  do_configure ${name} \
  "--enable-inline-optimization \
@@ -1047,7 +1083,7 @@ build_postfix()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- cat $CWD/patch/postfix-vda-v10-2.8.8.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ apply_patch $CWD/patches/postfix-vda-v10-2.8.8.patch 1
 
  do_configure ${name}
 
@@ -1259,7 +1295,7 @@ build_clamsmtp()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- # cat $CWD/patch/use_mkstemp.patch | patch -p1 >/dev/null 2>&1 || { msg error "Failed to apply patch."; exit 1; }
+ apply_patch $CWD/patches/use_mkstemp.patch 1
 
  do_configure ${name} "--disable-dependency-tracking"
 
