@@ -889,6 +889,8 @@ build_nginx()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${NGINX_URL}"
+ local wwwlog=/var/log/${name}
+ local wwwdir=${DATA}/www
 
  [ -d build ] || mkdir -p build
  cd build
@@ -921,12 +923,19 @@ build_nginx()
   --without-mail_imap_module \
   --without-mail_smtp_module"
 
+ stop_service ${name}
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
- create_user www 10100 "Nginx Web Server" /srv/www
+ create_user www 10100 "nginx http/https server" ${wwwdir}
 
- mkdir_as_root /var/log/nginx 0770
- chown_as_root www root /var/log/nginx
+ mkdir_as_root ${wwwlog} 0770
+ chown_as_root www root ${wwwlog}
+
+ mkdir_as_root ${wwwdir} 0755
+ chown_as_root www root ${wwwdir}
+
+ start_service ${name}
 
  cd $CWD
 }
@@ -1006,7 +1015,7 @@ build_php()
   --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
   --with-pdo-mysql=${PREFIX}/mysql"
 
- stop_service php-fpm
+ stop_service ${name}-fpm
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
@@ -1020,33 +1029,33 @@ build_php()
     cp_as_root php.ini-production ${PREFIX}/${name}/conf/php.ini
     chown_as_root root root ${PREFIX}/${name}/conf
  fi
- if [ ! -e ${PREFIX}/${name}/conf/php-fpm.conf ]; then
-    msg info "Copying new configuration file for $name (php-fpm.conf) ..."
-    cp_as_root $CWD/config.d/php-fpm.conf ${PREFIX}/${name}/conf/php-fpm.conf
+ if [ ! -e ${PREFIX}/${name}/conf/${name}-fpm.conf ]; then
+    msg info "Copying new configuration file for $name (${name}-fpm.conf) ..."
+    cp_as_root $CWD/config.d/${name}-fpm.conf ${PREFIX}/${name}/conf/${name}-fpm.conf
     chown_as_root root root ${PREFIX}/${name}/conf
-    [ -e ${PREFIX}/${name}/conf/php-fpm.conf ] && \
+    [ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && \
     $cmd sed -i
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-      ${PREFIX}/${name}/conf/php-fpm.conf
+      ${PREFIX}/${name}/conf/${name}-fpm.conf
  fi
 
- if [ ! -e /etc/init.d/php-fpm ]; then
-    msg info "Copying start/stop script for $name (/etc/init.d/php-fpm) ..."
-    cp_as_root $CWD/scripts/php-fpm /etc/init.d/php-fpm
-    chown_as_root root root /etc/init.d/php-fpm
-    chmod_as_root 0755 /etc/init.d/php-fpm
-    [ -e /etc/init.d/php-fpm ] && \
+ if [ ! -e /etc/init.d/${name}-fpm ]; then
+    msg info "Copying start/stop script for $name (/etc/init.d/${name}-fpm) ..."
+    cp_as_root $CWD/scripts/${name}-fpm /etc/init.d/${name}-fpm
+    chown_as_root root root /etc/init.d/${name}-fpm
+    chmod_as_root 0755 /etc/init.d/${name}-fpm
+    [ -e /etc/init.d/${name}-fpm ] && \
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-      /etc/init.d/php-fpm
+      /etc/init.d/${name}-fpm
  fi
 
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
  fi
 
- start_service php-fpm
+ start_service ${name}-fpm
 
  cd $CWD
 }
@@ -1076,11 +1085,15 @@ build_monit()
   --program-suffix= \
   --enable-optimized"
 
+ stop_service ${name}
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
  [ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0750
+
+ start_service ${name}
 
  cd $CWD
 }
