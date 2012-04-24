@@ -238,9 +238,9 @@ get_dependency()
     cmd="sudo ${cmd}"
  fi
  msg info "Installing required dependencies for ${name}"
- msg warn "*** (for more information please check ${logfile}) ***"
- sleep 1
+ msg info "Logfile saved in ${logfile}"
  ${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
+ sleep 1
 }
 
 # set build CFLAGS/CXXFLAGS flags
@@ -445,10 +445,10 @@ run_make()
  fi
 
  if [ "${name}" != "postfix" ]; then
-    msg info "Installing ${name} from compiled source ($cmd make install)"
+    msg info "Installing ${name} from compiled source (make install)"
     $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  else
-    msg info "Installing ${name} from compiled source ($cmd sh ./postfix-install -non-interactive)"
+    msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
     $cmd sh ./postfix-install -non-interactive \
        install_root="${PREFIX}/${name}" \
        config_directory="/conf" \
@@ -737,8 +737,6 @@ start_service()
 need_mysql()
 {
  local name=$1
- export buildall=1
-
  if [ ! -x ${PREFIX}/mysql/bin/mysql_config ]; then
    msg info "MySQL is not installed, we need it before building ${name}"
    trigger mysql
@@ -749,7 +747,6 @@ need_mysql()
 need_php()
 {
  local name=$1
- export buildall=1
  if [ ! -x ${PREFIX}/php/bin/phpize ]; then
    msg info "PHP is not available, we need it before building ${name}"
    trigger php
@@ -861,7 +858,7 @@ build_mysql()
     [ -e ${db_install_log} ] && rm -f ${db_install_log}
     export PATH="${PREFIX}/${name}/bin:$PATH"
     msg info "Installing MySQL database in ${dbdir} ..."
-    msg warn "*** (for more information please check ${db_install_log}) ***"
+    msg warn "Logfile saved in ${db_install_log}"
     $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
       --basedir=${PREFIX}/${name} \
       --datadir=${dbdir} \
@@ -1056,11 +1053,11 @@ build_php()
       /etc/init.d/${name}-fpm
  fi
 
+ start_service ${name}-fpm
+
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
  fi
-
- start_service ${name}-fpm
 
  cd $CWD
 }
