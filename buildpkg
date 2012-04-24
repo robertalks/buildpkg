@@ -31,10 +31,10 @@ export triggeroff=0
 usage()
 {
  cat << EOF
-$NAME script $VERSION
+${name} script $VERSION
 Report bugs at <robert@linux-source.org>
 
-Usage: $NAME [options...]
+Usage: ${name} [options...]
 
   OPTIONS:
     --help              display this message.
@@ -43,9 +43,9 @@ Usage: $NAME [options...]
     --all               build all available packages.
 
   EXAMPLE:
-    $NAME --pkg=mysql (build mysql package)
+    ${name} --pkg=mysql (build mysql package)
       or
-    $NAME --all (build all packages available)
+    ${name} --all (build all packages available)
 
   AVAILABLE PACKAGES:
     $PACKAGES
@@ -60,13 +60,13 @@ msg()
  local message=$2
  case "$type" in
    info)
-    echo "$NAME: info: $message" ;;
+    echo "${NAME}: info: $message" ;;
    warn)
-    echo "$NAME: warn: $message" ;;
+    echo "${NAME}: warn: $message" ;;
    error)
-    echo "$NAME: error: $message" ;;
+    echo "${NAME}: error: $message" ;;
    *)
-    echo '$NAME: missing arguments, usage: "error some message"' ;;
+    echo '${NAME}: missing arguments, usage: "error some message"' ;;
  esac
 }
 
@@ -87,7 +87,7 @@ set_global_conf()
  else
     usage
     msg error "unable to find a configuration file."
-    msg error "im looking for: /etc/$NAME.conf or ~/$NAME.conf or ~/.$NAME.conf"
+    msg error "im looking for: /etc/${NAME}.conf or ~/${NAME}.conf or ~/.${NAME}.conf"
     exit 1
  fi
 
@@ -199,7 +199,7 @@ is_sudo()
  if [ $uid -ne 0 ]; then
     if [ ! -x /usr/bin/sudo ]; then
        msg error "Sudo not found, we are running as normal user, we cant go on."
-       msg error "Please install sudo as root and then try again, or run $NAME with root rights."
+       msg error "Please install sudo as root and then try again, or run ${NAME} with root rights."
        sleep 5
        exit 1
     fi
@@ -656,7 +656,7 @@ create_user()
  # example: create_user www 10100 "Web User" /home/www
  local user=$1 # username
  local uid=$2  # uniq id
- local name=$3 # username geos
+ local geos=$3 # username geos
  local home=$4 # username home
  local cmd=
  local curruid=$(id -u)
@@ -671,7 +671,7 @@ create_user()
  fi
  if ! getent passwd ${user} >/dev/null 2>&1; then
      msg info "Creating user ${user} ..."
-     ${cmd} useradd -c "${name}" -u ${uid} -l -g ${uid} -M -s /bin/false -d ${home} -r ${user} || { msg error "Failed to create user ${user}."; exit 1; }
+     ${cmd} useradd -c "${geos}" -u ${uid} -l -g ${uid} -M -s /bin/false -d ${home} -r ${user} || { msg error "Failed to create user ${user}."; exit 1; }
  fi
 
  ${cmd} /usr/sbin/pwck -s 2>/dev/null || msg error "Failed to sort /etc/passwd."
@@ -835,7 +835,7 @@ build_mysql()
 
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
-    msg info "Copying new configuration file for $name (my.cnf) ..."
+    msg info "Copying new configuration file for ${name} (my.cnf) ..."
     cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
     chown_as_root root root ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/my.cnf ] && \
@@ -846,7 +846,7 @@ build_mysql()
       ${PREFIX}/${name}/conf/my.cnf
  fi
  if [ ! -e /etc/init.d/mysql ]; then
-    msg info "Copying start/stop script for $name (/etc/init.d/mysql) ..."
+    msg info "Copying start/stop script for ${name} (/etc/init.d/mysql) ..."
     cp_as_root $CWD/scripts/mysql /etc/init.d/mysql
     chown_as_root root root /etc/init.d/mysql
     chmod_as_root 0755 /etc/init.d/mysql
@@ -1009,6 +1009,7 @@ build_php()
   --enable-sysvsem \
   --with-readline \
   --with-config-file-path=${PREFIX}/${name}/conf \
+  --with-config-file-scan-dir=${PREFIX}/${name}/conf/conf.d \
   --with-freetype-dir=/usr \
   --with-jpeg-dir=/usr \
   --with-mysql-sock=${TMPSRV}/mysql.sock \
@@ -1025,23 +1026,26 @@ build_php()
  chown_as_root www root /var/log/nginx
 
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
- if [ ! -e ${PREFIX}/${name}/conf/php.ini ]; then
-    msg info "Copying new configuration file for $name (php.ini) ..."
-    cp_as_root php.ini-production ${PREFIX}/${name}/conf/php.ini
+ if [ ! -e ${PREFIX}/${name}/conf/${name}.ini ]; then
+    msg info "Copying new configuration file for ${name} (${name}.ini) ..."
+    cp_as_root $CWD/config.d/${name}.ini ${PREFIX}/${name}/conf/${name}.ini
     chown_as_root root root ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/${name}.ini ] && \
+    $cmd sed -i \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/${name}/conf/${name}.ini
  fi
  if [ ! -e ${PREFIX}/${name}/conf/${name}-fpm.conf ]; then
-    msg info "Copying new configuration file for $name (${name}-fpm.conf) ..."
+    msg info "Copying new configuration file for ${name} (${name}-fpm.conf) ..."
     cp_as_root $CWD/config.d/${name}-fpm.conf ${PREFIX}/${name}/conf/${name}-fpm.conf
     chown_as_root root root ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && \
-    $cmd sed -i
+    $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       ${PREFIX}/${name}/conf/${name}-fpm.conf
  fi
-
  if [ ! -e /etc/init.d/${name}-fpm ]; then
-    msg info "Copying start/stop script for $name (/etc/init.d/${name}-fpm) ..."
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-fpm) ..."
     cp_as_root $CWD/scripts/${name}-fpm /etc/init.d/${name}-fpm
     chown_as_root root root /etc/init.d/${name}-fpm
     chmod_as_root 0755 /etc/init.d/${name}-fpm
@@ -1107,6 +1111,12 @@ build_eaccelerator()
  local tarball="${name}-${version}.tar.bz2"
  local dir="${name}-${version}"
  local url="${EACCELERATOR_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1127,8 +1137,22 @@ build_eaccelerator()
 
  do_configure ${name} "--enable-eaccelerator=shared"
 
+ stop_service php-fpm
+
  run_make ${name}
  strip_dir ${PREFIX}/php
+
+ [ -d ${PREFIX}/php/conf/conf.d ] || mkdir_as_root ${PREFIX}/php/conf/conf.d
+ if [ ! -e ${PREFIX}/php/conf/conf.d/eaccelerator.ini ]; then
+    msg info "Copying new configuration file for ${name} (${name}.ini) ..."
+    cp_as_root $CWD/config.d/eaccelerator.ini ${PREFIX}/php/conf/conf.d/eaccelerator.ini
+    chown_as_root root root ${PREFIX}/php/conf/conf.d
+    $cmd sed -i \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/php/conf/conf.d/eaccelerator.ini
+ fi
+
+ start_service php-fpm
 
  cd $CWD
 }
@@ -1385,7 +1409,7 @@ build_clamav()
  fi
 
  if [ ! -e /etc/init.d/${name}-clamd ]; then
-    msg info "Copying start/stop script for $name (/etc/init.d/${name}-clamd) ..."
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-clamd) ..."
     cp_as_root $CWD/scripts/${name}-clamd /etc/init.d/${name}-clamd
     chown_as_root root root /etc/init.d/${name}-clamd
     chmod_as_root 0755 /etc/init.d/${name}-clamd
@@ -1395,7 +1419,7 @@ build_clamav()
       /etc/init.d/${name}-clamd
  fi
  if [ ! -e /etc/init.d/${name}-freshclam ]; then
-    msg info "Copying start/stop script for $name (/etc/init.d/${name}-freshclam) ..."
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-freshclam) ..."
     cp_as_root $CWD/scripts/${name}-freshclam /etc/init.d/${name}-freshclam
     chown_as_root root root /etc/init.d/${name}-freshclam
     chmod_as_root 0755 /etc/init.d/${name}-freshclam
@@ -1599,7 +1623,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $buildpkg -eq 1 ]; then
-   if [ -z "$name" ]; then
+   if [ -z "${name}" ]; then
       usage
       msg error "missing package name."
       exit 1
@@ -1607,14 +1631,14 @@ if [ $buildpkg -eq 1 ]; then
       pkg=$(echo $PACKAGES | grep -w ${name} 2>/dev/null)
       if [ -z "$pkg" ]; then
          usage
-         msg error "$name package is not available at this moment."
+         msg error "${name} package is not available at this moment."
          exit 1
       else
          # check if is debian/ubuntu, if not exit,
          # we can't handle other type of distro's, yet.
          is_debian
 
-         msg info "Building now package: $name"
+         msg info "Building now package: ${name}"
          build_${name}
       fi
    fi
