@@ -708,7 +708,7 @@ stop_service()
 
  if [ -e /etc/init.d/${name} ]; then
      msg info "Shutting down ${name} ..."
-     $cmd sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg error "Failed to shutdown ${name}."
+     $cmd sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg warn "Failed to shutdown ${name}."
  else
      msg warn "Initscript for ${name} not found."
  fi
@@ -727,7 +727,7 @@ start_service()
 
  if [ -e /etc/init.d/${name} ]; then
      msg info "Starting up ${name} ..."
-     $cmd sh /etc/init.d/${name} start >/dev/null 2>&1 || msg error "Failed to start ${name}."
+     $cmd sh /etc/init.d/${name} start >/dev/null 2>&1 || msg warn "Failed to start ${name}."
  else
      msg warn "Initscript for ${name} not found."
  fi
@@ -1361,20 +1361,24 @@ build_clamav()
  mkdir_as_root $TMPSRV 0777
  chown_as_root root root $TMPSRV
 
- if [ ! -e ${PREFIX}/${name}/conf/clamd.conf ]; then
+ if [ $(grep -qw ^Example ${PREFIX}/${name}/conf/clamd.conf 2>/dev/null; echo $?) -eq 0 ]; then
     msg info "Copying new configuration file for ${name} (clamd.conf) ..."
-    cp_as_root $CWD/config.d/clamd.conf  ${PREFIX}/${name}/conf
+    rm -f ${PREFIX}/${name}/conf/clamd.conf >/dev/null 2>&1
+    cp_as_root $CWD/config.d/clamd.conf ${PREFIX}/${name}/conf
+    chown_as_root root root ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/clamd.conf ] && \
-    $cmd sed -i
+    $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/clamd.conf
  fi
- if [ ! -e ${PREFIX}/${name}/conf/freshclam.conf ]; then
+ if [ $(grep -qw ^Example ${PREFIX}/${name}/conf/freshclam.conf 2>/dev/null; echo $?) -eq 0 ]; then
     msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
+    rm -f ${PREFIX}/${name}/conf/freshclam.conf >/dev/null 2>&1
     cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
+    chown_as_root root root ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && \
-    $cmd sed -i
+    $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/freshclam.conf
@@ -1399,6 +1403,15 @@ build_clamav()
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       /etc/init.d/${name}-freshclam
+ fi
+
+ if [ -d /var/lib/${name} ]; then
+    msg info "Updating ${name} anti-virus definitions ..."
+    msg info " * please wait, time may take a while, depending on your internet connetion speed."
+    ${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+       msg warn "something happened, wasnt able to update anti-virus definitions."
+    fi
  fi
 
  start_service ${name}-clamd
