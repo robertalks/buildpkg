@@ -16,20 +16,30 @@ php_fpm_bin=${exec_prefix}/sbin/php-fpm
 php_fpm_conf=${exec_prefix}/conf/php-fpm.conf
 php_fpm_pid=/var/run/php-fpm.pid
 php_opts="--fpm-config ${php_fpm_conf}"
+user=www
+
+NAME=php-fpm
+DESC=php-fpm
 
 PATH=${exec_prefix}/sbin:${exec_prefix}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-USER=www
-NAME=php-fpm
-DESC=$NAME
+test -x ${php_fpm_bin} || exit 0
+set -e
 
 . /lib/lsb/init-functions
 ulimit -n 4096
 
 sanity()
 {
- mkdir -p @@TMPSRV@@/php/{log,sess,tmp,eaccelerator} >/dev/null 2>&1
- chown ${USER}.${USER} -R @@TMPSRV@@/php >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php @@TMPSRV@@/php/{log,sess,tmp,eaccelerator} >/dev/null 2>&1
+ mkdir -p @@TMPSRV@@/php/log >/dev/null 2>&1
+ mkdir -p @@TMPSRV@@/php/sess >/dev/null 2>&1
+ mkdir -p @@TMPSRV@@/php/tmp >/dev/null 2>&1
+ mkdir -p @@TMPSRV@@/php/eaccelerator >/dev/null 2>&1
+ chown ${user}.${user} -R @@TMPSRV@@/php >/dev/null 2>&1
+ chmod 0770 @@TMPSRV@@/php >/dev/null 2>&1
+ chmod 0770 @@TMPSRV@@/php/log >/dev/null 2>&1
+ chmod 0770 @@TMPSRV@@/php/sess >/dev/null 2>&1
+ chmod 0770 @@TMPSRV@@/php/tmp >/dev/null 2>&1
+ chmod 0770 @@TMPSRV@@/php/eaccelerator >/dev/null 2>&1
 }
 
 wait_for_pid () {

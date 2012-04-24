@@ -20,7 +20,6 @@ test -x $DAEMON || exit 0
 set -e
 
 . /lib/lsb/init-functions
-
 ulimit -n 4096
 
 sanity()
