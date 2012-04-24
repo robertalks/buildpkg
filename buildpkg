@@ -682,9 +682,9 @@ create_user()
 trigger()
 {
  local name=$1
- if [ $triggeroff -ne 1 ]; then
+ if [ $triggeroff -eq 0 ]; then
   if [ -n ${name} ]; then
-     sleep 2
+     sleep 1
      msg info "Triggered (re)build of ${name} ..."
      build_${name} 2>/dev/null || msg error "Failed to (re)build ${name}."
   else
@@ -1588,6 +1588,11 @@ while [ $# -gt 0 ]; do
     exit 0
   ;;
 
+  --dont-trigger)
+     export triggeroff=1
+     shift
+  ;;
+
   --pkg*)
      if [ "$1" != "${1##--pkg=}" ]; then
         name="${1##--pkg=}"
@@ -1596,11 +1601,6 @@ while [ $# -gt 0 ]; do
         shift
      fi
      buildpkg=1
-  ;;
-
-  --dont-trigger)
-     export triggeroff=1
-     shift
   ;;
 
   --all)
