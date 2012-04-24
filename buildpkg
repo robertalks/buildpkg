@@ -811,10 +811,10 @@ build_mysql()
   -DMYSQL_DATADIR=${dbdir} \
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock \
   -DFEATURE_SET=community \
-  -DCOMPILATION_COMMENT='MySQL Community Server' \
+  -DCOMPILATION_COMMENT=MySQL_Community_Server \
   -DMANUFACTURER=$HOST"
 
- stop_service mysql
+ stop_service ${name}
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
@@ -841,7 +841,8 @@ build_mysql()
     [ -e ${PREFIX}/${name}/conf/my.cnf ] && \
     $cmd sed -i \
       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-      -e "s|@@MYDB@@|${dbdir}|g" \
+      -e "s|@@MYDB@@|${MYDB}|g" \
+      -e "s|@@MYLOG@@|${MYDB}|g" \
       ${PREFIX}/${name}/conf/my.cnf
  fi
  if [ ! -e /etc/init.d/mysql ]; then
@@ -852,7 +853,7 @@ build_mysql()
     [ -e /etc/init.d/mysql ] && \
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-      -e "s|@@MYDB@@|${dbdir}|g" \
+      -e "s|@@MYDB@@|${MYDB}|g" \
       /etc/init.d/mysql
  fi
 
@@ -869,7 +870,7 @@ build_mysql()
    msg info "MySQL database found, we wont do nothing."
  fi
 
- start_service mysql
+ start_service ${name}
 
  if [ ${buildall} -eq 0 ]; then
     trigger pam_mysql
