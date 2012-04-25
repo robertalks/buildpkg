@@ -26,7 +26,7 @@ test -x ${php_fpm_bin} || exit 0
 set -e
 
 . /lib/lsb/init-functions
-ulimit -n 4096
+ulimit -n 2048
 
 sanity()
 {

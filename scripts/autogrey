@@ -1,6 +1,6 @@
 #!/bin/bash
 
-/appls/greyfix/sbin/greyfix \
+@@PREFIX@@/sbin/greyfix \
   --home /var/lib/greyfix \
   --greylisted-action "PREPEND X-Greyfix: Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
   --reject-action "DEFER_IF_PERMIT Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
