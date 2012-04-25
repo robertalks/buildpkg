@@ -11,7 +11,6 @@
 
 prefix=@@PREFIX@@
 DAEMON=${prefix}/sbin/nginx
-USER=www
 NAME=nginx
 DESC=nginx
 
@@ -22,14 +21,21 @@ set -e
 . /lib/lsb/init-functions
 ulimit -n 2048
 
+user=www
 sanity()
 {
- [ -d /var/log/${NAME} ] || mkdir -p /var/log/${NAME}
- chown root.root -R /var/log/${NAME}
- chmod 0770 /var/log/${NAME}
- mkdir -p @@TMPSRV@@/nginx/{fastcgi,client,proxy}
- chown ${USER}.root -R @@TMPSRV@@/nginx
- chmod 0770 @@TMPSRV@@/nginx @@TMPSRV@@/nginx/{fastcgi,client,proxy}
+ [ -d /var/log/nginx ] || mkdir -p /var/log/nginx
+ chown ${user}.root -R /var/log/nginx
+ chmod 0770 /var/log/nginx
+ mkdir -p @@TMPSRV@@/nginx/
+ mkdir -p @@TMPSRV@@/fastcgi
+ mkdir -p @@TMPSRV@@/client
+ mkdir -p @@TMPSRV@@/proxy
+ chown ${user}.root -R @@TMPSRV@@/nginx
+ chmod 0770 @@TMPSRV@@/nginx
+ chmod 0770 @@TMPSRV@@/nginx/fastcgi
+ chmod 0770 @@TMPSRV@@/nginx/client
+ chmod 0770 @@TMPSRV@@/nginx/proxy
 }
 
 start_nginx()
