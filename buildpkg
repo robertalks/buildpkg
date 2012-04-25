@@ -1222,6 +1222,7 @@ build_postfix()
  local url="${POSTFIX_URL}"
  local queue="/var/spool/${name}"
  local lib="/var/lib/${name}"
+ local date=$(date "+%Y%m%d")
  local uid=$(id -u)
  local cmd=
 
@@ -1245,6 +1246,15 @@ build_postfix()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/postfix-vda-v10-2.8.8.patch 1
+
+ if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
+    msg info "Backing up main.cf configuration file to main.cf.${date} ..."
+    cp_as_root ${PREFIX}/${name}/conf/main.cf ${PREFIX}/${name}/conf/main.cf.${date}
+ fi
+ if [ -e ${PREFIX}/${name}/conf/master.cf ]; then
+    msg info "Backing up master.cf configuration file to master.cf.${date} ..."
+    cp_as_root ${PREFIX}/${name}/conf/master.cf cp_as_root ${PREFIX}/${name}/conf/master.cf.${date}
+ fi
 
  do_configure ${name}
 
