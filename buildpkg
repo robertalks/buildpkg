@@ -1306,7 +1306,6 @@ build_postfix()
  ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/newaliases
  ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/mailq
  ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/lib/sendmail
- ln_as_root ${PREFIX}/${name}/conf /etc/postfix
 
  if [ ! -e /etc/init.d/${name} ]; then
     msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
