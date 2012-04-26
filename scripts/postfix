@@ -2,7 +2,7 @@
 
 ### BEGIN INIT INFO
 # Provides:          postfix
-# Required-Start:    $local_fs $remote_fs $network $syslog clamd mysql dovecot
+# Required-Start:    $local_fs $remote_fs $network $syslog clamav-clamd mysql
 # Required-Stop:     $local_fs $remote_fs $network $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6

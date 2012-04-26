@@ -40,7 +40,7 @@ sanity()
 
 start_nginx()
 {
- log_daemon_msg "Starting Nginx Webserver" "$DESC"
+ log_daemon_msg "Starting nginx http/https server" "$DESC"
  if start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
            --exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
     log_end_msg 0
@@ -51,7 +51,7 @@ start_nginx()
 
 stop_nginx()
 {
- log_daemon_msg "Stopping Nginx Webserver" "$DESC"
+ log_daemon_msg "Stopping nginx http/https server" "$DESC"
  if start-stop-daemon --stop --quiet --pidfile /var/run/$NAME.pid \
                --exec $DAEMON >/dev/null 2>&1; then
     log_end_msg 0
@@ -77,7 +77,7 @@ case "$1" in
   ;;
 
   reload)
-    echo -n "Reloading Nginx Webserver configuration" "$DESC"
+    echo -n "Reloading nginx http/https server configuration" "$DESC"
     if start-stop-daemon --stop --signal HUP --quiet --pidfile /var/run/$NAME.pid \
           --exec $DAEMON >/dev/null 2>&1; then
        log_end_msg 0
