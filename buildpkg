@@ -1240,12 +1240,12 @@ build_postfix()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- get_patch http://vda.sourceforge.net/VDA postfix-vda-v10-2.8.8.patch
+ get_patch http://vda.sourceforge.net/VDA postfix-vda-${VDA_PATCH_VERSION}.patch
 
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/postfix-vda-v10-2.8.8.patch 1
+ apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch 1
 
  if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
     msg info "Backing up main.cf configuration file to main.cf.${date} ..."
@@ -1263,10 +1263,19 @@ build_postfix()
  fi
  create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
 
+ cd lib
+  for i in dns global master tls util milter; do
+     ln -sf lib${i}.a lib${name}-${i}.so.1.0.1
+     ln -sf lib${i}.a lib${i}.so.1.0.1
+  done
+ cd ..
+
  stop_service ${name}
 
+ export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
  run_make ${name}
  strip_dir ${PREFIX}/${name}
+ export LD_LIBRARY_PATH=
 
  [ -d ${lib} ] || mkdir_as_root ${lib}
  [ -d ${queue} ] || mkdir_as_root ${queue}
