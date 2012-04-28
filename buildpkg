@@ -742,28 +742,28 @@ start_service()
 need_mysql()
 {
  local name=$1
- local localpkg=$buildpkg
+ local localall=$buildall
 
- export buildpkg=1
+ export buildall=1
  if [ ! -x ${PREFIX}/mysql/bin/mysql_config ]; then
    msg info "MySQL is not installed, we need it before building ${name}"
    trigger mysql
  fi
- export buildpkg=$localpkg
+ export buildall=$localall
 }
 
 # trigger build of php, some packages need this
 need_php()
 {
  local name=$1
- local localpkg=$buildpkg
+ local localall=$buildall
 
- export buildpkg=1
+ export buildall=1
  if [ ! -x ${PREFIX}/php/bin/phpize ]; then
    msg info "PHP is not available, we need it before building ${name}"
    trigger php
  fi
- export buildpkg=$localpkg
+ export buildall=$localall
 }
 
 # build and install mysql server
