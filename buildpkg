@@ -317,7 +317,7 @@ get_patch()
     msg info "Fetching patch file ${patchfile} from ${url}/${patchname}"
     /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${patchfile}" "${url}/${patchname}" || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
  else
-   msg warn "Patch file ${patchname} already exists."
+    msg warn "Patch file ${patchname} already exists."
  fi
 }
 
@@ -742,20 +742,28 @@ start_service()
 need_mysql()
 {
  local name=$1
+ local localpkg=$buildpkg
+
+ export buildpkg=1
  if [ ! -x ${PREFIX}/mysql/bin/mysql_config ]; then
    msg info "MySQL is not installed, we need it before building ${name}"
    trigger mysql
  fi
+ export buildpkg=$localpkg
 }
 
 # trigger build of php, some packages need this
 need_php()
 {
  local name=$1
+ local localpkg=$buildpkg
+
+ export buildpkg=1
  if [ ! -x ${PREFIX}/php/bin/phpize ]; then
    msg info "PHP is not available, we need it before building ${name}"
    trigger php
  fi
+ export buildpkg=$localpkg
 }
 
 # build and install mysql server
