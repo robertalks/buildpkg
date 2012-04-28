@@ -27,10 +27,10 @@ sanity()
  [ -d /var/log/nginx ] || mkdir -p /var/log/nginx
  chown ${user}.root -R /var/log/nginx
  chmod 0770 /var/log/nginx
- mkdir -p @@TMPSRV@@/nginx/
- mkdir -p @@TMPSRV@@/fastcgi
- mkdir -p @@TMPSRV@@/client
- mkdir -p @@TMPSRV@@/proxy
+ mkdir -p @@TMPSRV@@/nginx
+ mkdir -p @@TMPSRV@@/nginx/fastcgi
+ mkdir -p @@TMPSRV@@/nginx/client
+ mkdir -p @@TMPSRV@@/nginx/proxy
  chown ${user}.root -R @@TMPSRV@@/nginx
  chmod 0770 @@TMPSRV@@/nginx
  chmod 0770 @@TMPSRV@@/nginx/fastcgi

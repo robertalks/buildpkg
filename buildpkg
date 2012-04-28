@@ -994,7 +994,7 @@ build_nginx()
     [ -e /etc/init.d/${name} ] && \
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-      -e "s|@@TMPSRV@@|${TMPSRV}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       /etc/init.d/${name} >/dev/null 2>&1
  fi
 
