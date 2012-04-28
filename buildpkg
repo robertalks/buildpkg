@@ -1028,12 +1028,12 @@ build_php()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- get_patch http://download.suhosin.org suhosin-patch-5.3.9-0.9.10.patch.gz
+ get_patch http://download.suhosin.org suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz
 
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/suhosin-patch-5.3.9-0.9.10.patch.gz 1
+ apply_patch $CWD/patches/suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz 1
 
  do_configure ${name} \
  "--enable-inline-optimization \
