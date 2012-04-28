@@ -407,19 +407,21 @@ do_configure()
    make makefiles \
     DEBUG="" \
     CCARGS=" \
+     -DNO_NIS \
      -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
      -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
      -DHAS_MYSQL -I${PREFIX}/mysql/include \
      -DHAS_SQLITE" \
     AUXLIBS=" \
-     -L/usr/lib -L/usr/lib/ssl/engines -L${PREFIX}/mysql/lib \
-     -Wl,-rpath ${PREFIX}/mysql/lib -Wl,-rpath /usr/lib \
-     -Wl,-rpath /usr/lib/ssl/engines \
+     -L${PREFIX}/mysql/lib \
+     -Wl,-rpath ${PREFIX}/mysql/lib \
+     -lpcre \
      -lsasl2 \
      -lssl -lcrypto \
-     -lmysqlclient -lz -lm \
-     -lsqlite3 -lpthread" \
+     -lmysqlclient -lz -lm -lrt -ldl \
+     -lsqlite3 -lpthread \
+     -Wno-comments" \
     OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  fi
 }
