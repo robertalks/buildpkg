@@ -1705,6 +1705,7 @@ build_phpmyadmin()
  local tarball="phpMyAdmin-${version}-all-languages.tar.gz"
  local dir="phpMyAdmin-${version}-all-languages"
  local url="${PHPMYADMIN_URL}"
+ local wwwdir=${DATA}/www
  local uid=$(id -u)
  local cmd=
 
@@ -1730,7 +1731,9 @@ build_phpmyadmin()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
+ mkdir_as_root ${wwwdir}
  mkdir_as_root ${PREFIX}/${name}
+ ln_as_root ${PREFIX}/${name} ${wwwdir}/${name}
  $cmd cp -aRf * ${PREFIX}/${name}
 
  stop_service nginx
@@ -1742,9 +1745,8 @@ build_phpmyadmin()
      cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
      [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
      $cmd sed -i \
-       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-       -e "s|@@NGINX@@|${PREFIX}/nginx|g" \
-       -e "s|@@DATA@@|${DATA}/www|g" \
+       -e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
+       -e "s|@@DATA@@|${DATA}/www/${name}|g" \
        ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
      chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
   fi
