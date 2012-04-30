@@ -1743,6 +1743,7 @@ build_phpmyadmin()
      [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
      $cmd sed -i \
        -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       -e "s|@@NGINX@@|${PREFIX}/nginx|g" \
        -e "s|@@DATA@@|${DATA}/www|g" \
        ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
      chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
