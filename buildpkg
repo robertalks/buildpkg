@@ -796,6 +796,20 @@ need_nginx()
  export buildall=$localall
 }
 
+# trigger build of postfix, some packages need this
+need_postfix()
+{
+ local name=$1
+ local localall=$buildall
+
+ export buildall=1
+ if [ ! -x ${PREFIX}/postfix/sbin/postfix ]; then
+   msg info "postfix is not available, we need it before building ${name}."
+   trigger postfix
+ fi
+ export buildall=$localall
+}
+
 # build and install mysql server
 build_mysql()
 {
@@ -1322,7 +1336,10 @@ build_postfix()
  do_configure ${name}
 
  if ! getent group postdrop >/dev/null 2>&1; then
-    groupadd -g 10102 postdrop
+     groupadd -g 10102 postdrop >/dev/null >/dev/null 2>&1 || { msg error "Failed to create group postdrop."; exit 1; }
+ fi
+ if ! getent passwd spamfilter >/dev/null 2>&1; then
+     useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/bash -r spamfilter >/dev/null 2>&1 || { msg error "Failed to create user ${user}."; exit 1; }
  fi
  create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
 
@@ -1465,9 +1482,18 @@ build_dovecot()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${DOVECOT_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
 
  # we need to make sure mysql is already installed.
  need_mysql ${name}
+
+ # we need to make sure postfix is already installed.
+ need_postfix ${name}
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1495,24 +1521,35 @@ build_dovecot()
   --with-mem-align=32 \
   --with-zlib"
 
+ stop_service ${name}
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
  create_user dovecot 10104 "Dovecot IMAP Server" ${PREFIX}/${name}
  create_user dovenull 10105 "Dovecot Null User" ${PREFIX}/${name}
  create_user vmail 10106 "Virtual Mailbox" ${DATA}/mail/vmail
- usermod -a -G mail vmail
- usermod -a -G postfix vmail
-
- if ! getent passwd spamfilter >/dev/null 2>&1; then
-     useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/bash -r spamfilter || { msg error "Failed to create user ${user}."; exit 1; }
- fi
+ $cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
+ $cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
 
  mkdir_as_root ${PREFIX}/${name}/conf/${name}
  mkdir_as_root /var/run/${name}
  mkdir_as_root ${DATA}/mail/vmail
  chown_as_root vmail root ${DATA}/mail/vmail
  chmod_as_root 0770 ${DATA}/mail/vmail
+
+ if [ ! -e /etc/init.d/${name} ]; then
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+    cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+    chown_as_root root root /etc/init.d/${name}
+    chmod_as_root 0755 /etc/init.d/${name}
+    [ -e /etc/init.d/${name} ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      /etc/init.d/${name} >/dev/null 2>&1
+ fi
+
+ start_service ${name}
 
  cd $CWD
 }
