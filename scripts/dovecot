@@ -45,7 +45,7 @@ case "$1" in
       kill $(cat $pidfile)
       log_end_msg 0
     else
-      log_end_msg 1
+      log_failure_msg "Dovecot server process is not running!"
     fi
     ;;
   reload)
@@ -54,7 +54,7 @@ case "$1" in
       kill -HUP $(cat $pidfile)
       log_end_msg 0
     else
-      log_end_msg 1
+      log_failure_msg "Dovecot server process is not running!"
     fi
     ;;
   restart|force-reload)

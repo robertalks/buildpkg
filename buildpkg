@@ -1526,17 +1526,33 @@ build_dovecot()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- create_user dovecot 10104 "Dovecot IMAP Server" ${PREFIX}/${name}
- create_user dovenull 10105 "Dovecot Null User" ${PREFIX}/${name}
+ mkdir_as_root ${PREFIX}/${name}/conf/${name}
+ mkdir_as_root /var/run/${name}
+ mkdir_as_root ${DATA}/mail/vmail
+
+ create_user dovecot 10104 "Dovecot IMAP Server" /var/run/${name}
+ create_user dovenull 10105 "Dovecot Null User" /var/run/${name}
  create_user vmail 10106 "Virtual Mailbox" ${DATA}/mail/vmail
  $cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
  $cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
 
- mkdir_as_root ${PREFIX}/${name}/conf/${name}
- mkdir_as_root /var/run/${name}
- mkdir_as_root ${DATA}/mail/vmail
  chown_as_root vmail root ${DATA}/mail/vmail
  chmod_as_root 0770 ${DATA}/mail/vmail
+
+ if [ ! -e ${PREFIX}/${name}/conf/${name}/${name}.conf ]; then
+    msg info "Copying new configuration file for ${name} (${name}.conf) ..."
+    cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}
+    msg info "Copying new configuration subdir conf.d for ${name} ..."
+    $cmd cp -aRf doc/example-config/conf.d ${PREFIX}/${name}/conf/${name}
+    [ -e ${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf ] && \
+    $cmd sed -i \
+      -e "/^ssl_cert/ s/ssl_cert/# ssl_cert/" \
+      -e "/^ssl_key/ s/ssl_key/# ssl_key/" \
+      -e "/^#ssl[[:space:]]=/ s/#//" \
+      -e "/^ssl[[:space:]]=/ s/yes/no/" \
+      ${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf >/dev/null 2>&1
+    chown_as_root root root ${PREFIX}/${name}/conf
+ fi
 
  if [ ! -e /etc/init.d/${name} ]; then
     msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
