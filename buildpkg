@@ -96,6 +96,7 @@ set_global_conf()
  [ -z "$MYDB" ] && MYDB=/srv/databases
  [ -z "$TMPSRV" ] && TMPSRV=/var/webservice
  [ -z "$HOST" ] && HOST="$(hostname -f)"
+ [ -z "$MYSQL_ROOT_PASSWORD" ] && MYSQL_ROOT_PASSWORD="C00lCat"
 
  [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -109,6 +110,8 @@ set_global_conf()
  [ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$SUHOSIN_PATCH_VERSION" ] && { msg error "SUHOSIN_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$VDA_PATCH_VERSION" ] && { msg error "VDA_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
  MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
@@ -139,7 +142,7 @@ set_global_conf()
     TARGET="$ARCH-linux-gnu"
  fi
 
- export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS
+ export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD
 
  # This should not be touched.
  # We need the proper versions of the applications which we want to build.
@@ -156,7 +159,9 @@ set_global_conf()
  CLAMAV_VERSION \
  CLAMSMTP_VERSION \
  PAM_MYSQL_VERSION \
- PHPMYADMIN_VERSION
+ PHPMYADMIN_VERSION \
+ SUHOSIN_PATCH_VERSION \
+ VDA_PATCH_VERSION
  export \
  MYSQL_URL \
  NGINX_URL \
@@ -357,7 +362,7 @@ apply_patch()
        [ -e ${logfile} ] && rm -f ${logfile} || :
        msg info "Applying patch file ${patch_file} with strip option -p${strip}."
        msg info "Logfile saved in ${logfile}"
-       $cmd ${patch_file} | patch -p${strip} > ${logfile} 2>&1
+       $cmd ${patch_file} | patch -p${strip} >> ${logfile} 2>&1
        if [ $? -ne 0 ]; then
           msg error "unable to apply patch ${patch_file}."
           exit $?
@@ -803,6 +808,7 @@ build_mysql()
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
  local dbdir="${MYDB}/${name}"
+ local db_install=0
  local uid=$(id -u)
  local cmd=
 
@@ -820,7 +826,7 @@ build_mysql()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/dont-build-examples-and-tests.patch.gz 1
+ apply_patch $CWD/patches/${name}_dont-build-examples-and-tests.patch.gz 1
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -893,19 +899,39 @@ build_mysql()
  fi
 
  if [ ! -e ${dbdir}/mysql/db.frm ]; then
+    db_install=1
     [ -e ${db_install_log} ] && rm -f ${db_install_log}
     export PATH="${PREFIX}/${name}/bin:$PATH"
     msg info "Installing MySQL database in ${dbdir} ..."
-    msg warn "Logfile saved in ${db_install_log}"
+    msg info "Logfile saved in ${db_install_log}"
     $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
       --basedir=${PREFIX}/${name} \
       --datadir=${dbdir} \
-      --user=mysql > ${db_install_log}
+      --user=mysql > ${db_install_log} 2>&1
  else
+   db_install=0
    msg info "MySQL database found, we wont do nothing."
  fi
 
  start_service ${name}
+
+ if [ $db_install -eq 1 ]; then
+    msg info "Updating default MySQL root user password ..."
+    $cmd ${PREFIX}/${name}/bin/mysqladmin -u root -h localhost password "${MYSQL_ROOT_PASSWORD}" >/dev/null 2>&1 || msg error "Failed to update the MySQL root user password."
+    msg info "Dropping all other MySQL users with empty passwords (for security reasons) ..."
+    $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+       -Bse "set sql_safe_updates = 0; delete from mysql.user where Password = ''; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
+       msg error "Failed to drop users."
+    msg info "Dropping MySQL test database (we have no use for an empty database) ..."
+    $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+       -Bse "drop database test; set sql_safe_updates = 0; delete from mysql.db; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
+       msg error "Failed to drop test database."
+    msg info "Running MySQL flush privileges, tables, status statements."
+    $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+       -Bse "flush privileges; flush tables; flush tables with read lock; flush status;" >/dev/null 2>&1 || \
+       msg error "Failed to run flush statements."
+    db_install=0
+ fi
 
  if [ ${buildall} -eq 0 ]; then
     trigger pam_mysql
@@ -1036,6 +1062,7 @@ build_php()
  local tarball="${name}-${version}.tar.bz2"
  local dir="${name}-${version}"
  local url="${PHP_URL}"
+ local wwwdir=${DATA}/www
  local uid=$(id -u)
  local cmd=
 
@@ -1043,12 +1070,12 @@ build_php()
     cmd="sudo"
  fi
 
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- # we need to make sure mysql is already installed.
- need_mysql ${name}
 
  get_dependency ${name}
 
@@ -1108,9 +1135,10 @@ build_php()
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
+ create_user www 10100 "nginx http/https server" ${wwwdir}
 
- mkdir_as_root /var/log/${name} 0770
- chown_as_root www root /var/log/${name}
+ mkdir_as_root /var/log/nginx 0770
+ chown_as_root www root /var/log/nginx
 
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
  if [ ! -e ${PREFIX}/${name}/conf/${name}.ini ]; then
@@ -1208,12 +1236,12 @@ build_eaccelerator()
     cmd="sudo"
  fi
 
+ # we need to make sure php is already installed.
+ need_php ${name}
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- # we need to make sure php is already installed.
- need_php ${name}
 
  get_dependency ${name}
 
@@ -1265,12 +1293,12 @@ build_postfix()
     cmd="sudo"
  fi
 
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- # we need to make sure mysql is already installed.
- need_mysql ${name}
 
  get_dependency ${name}
 
@@ -1438,12 +1466,12 @@ build_dovecot()
  local dir="${name}-${version}"
  local url="${DOVECOT_URL}"
 
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- # we need to make sure mysql is already installed.
- need_mysql ${name}
 
  get_dependency ${name}
 
@@ -1621,7 +1649,7 @@ build_clamsmtp()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/use_mkstemp.patch.gz 1
+ apply_patch $CWD/patches/${name}_use_mkstemp.patch.gz 1
 
  do_configure ${name} "--disable-dependency-tracking"
 
@@ -1644,26 +1672,33 @@ build_pam_mysql()
  local dir="${name}-${version}"
  local url="${PAM_MYSQL_URL}"
 
+ # we need to make sure mysql is already installed.
+ need_mysql ${name}
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- # we need to make sure mysql is already installed.
- need_mysql ${name}
 
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+ apply_patch $CWD/patches/${name}_openssl.patch.gz 1
+
+ # In some newer systems, pam modules are not in /lib/security, but some other place.
+ PAM_MODULES_DIR=$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)
 
  do_configure ${name} \
  "--with-openssl \
   --with-cyrus-sasl=/usr \
   --with-pam=/usr \
-  --with-mysql=${PREFIX}/mysql"
+  --with-mysql=${PREFIX}/mysql \
+  --with-pam-mods-dir=${PAM_MODULES_DIR}"
 
  run_make ${name}
- strip_file /lib/security/${name}.so
+ rm_as_root ${PAM_MODULES_DIR}/${name}.la
+ chmod_as_root 0644 ${PAM_MODULES_DIR}/${name}.so
+ strip_file ${PAM_MODULES_DIR}/${name}.so
 
  cd $CWD
 }
@@ -1713,18 +1748,18 @@ build_phpmyadmin()
     cmd="sudo"
  fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
-
  # we need to make sure mysql is already installed.
  need_mysql ${name}
+
+ # we need to make sure nginx is already installed.
+ need_nginx ${name}
 
  # we need to make sure php is already installed.
  need_php ${name}
 
- # we need to make sure nginx is already installed.
- need_nginx ${name}
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
