@@ -5,9 +5,9 @@ VERSION=1.0.1
 CWD=$(pwd)
 
 # Do not modify this, this are the only supported applications.
-PACKAGES="mysql nginx php monit eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin"
+PACKAGES="monit mysql nginx php eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin"
 
-mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool patch libaio-dev libssl-dev"
+mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
@@ -15,11 +15,11 @@ libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
 libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
 libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev \
 libkrb5-dev libldap2-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
-libsasl2-dev libtidy-dev re2c zlib1g-dev patch bzip2"
+libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
 monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev"
-postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev patch"
+postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev libldap2-dev"
 greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
-dovecotdeps="build-essential intltool libtool libdb-dev libldap2-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev"
+dovecotdeps="build-essential intltool libtool libdb-dev libldap2-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev libldap2-dev"
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
@@ -288,10 +288,12 @@ download()
     get_package wget
  fi
 
- echo -n "    "
- /usr/bin/wget --progress=dot "${url}" -O "${output}" 2>&1 | grep --line-buffered "%" | sed -u -e "s,\.,,g" | awk '{printf("\b\b\b\b%4s", $2)}'
- echo -ne "\b\b\b\b"
- echo " 100%"
+ /usr/bin/wget --max-redirect=10 --no-check-certificate --no-cookies -q "${url}" -O "${output}" >/dev/null 2>&1
+ if [ $? -eq 0 ]; then
+    echo "OK"
+ else
+    echo "Failed"
+ fi
 }
 
 # download package source
@@ -360,6 +362,10 @@ apply_patch()
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-patches.log
  local cmd=
+
+ if [ ! -x /usr/bin/patch ]; then
+    get_package patch
+ fi
 
  if [ -s ${patch_file} ]; then
     if [ $(file ${patch_file} |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
@@ -440,7 +446,7 @@ do_configure()
     CCARGS=" \
      -DNO_NIS \
      -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
-     -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
+     -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE -DHAS_LDAP \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
      -DHAS_MYSQL -I${PREFIX}/mysql/include \
      -Wno-comments" \
@@ -448,8 +454,8 @@ do_configure()
      -L${PREFIX}/mysql/lib \
      -Wl,-rpath ${PREFIX}/mysql/lib \
      -lpcre \
-     -lsasl2 \
-     -lssl -lcrypto \
+     -lldap -llber \
+     -lsasl2 -lssl -lcrypto \
      -lmysqlclient -lsqlite3 \
      -lpthread -lz -lm -lrt -ldl -lresolv" \
     OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
@@ -501,7 +507,7 @@ chown_dir()
  local dir=$1
  local whoami="$(whoami)"
 
- chown ${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
+ chown ${whoami}.${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
 }
 
 # change ownership as root
@@ -1516,9 +1522,11 @@ build_dovecot()
  "--with-shadow \
   --with-pam \
   --with-mysql \
+  --with-ldap \
   --with-ssl=openssl \
   --with-ssldir=${PREFIX}/${name}/ssl \
-  --with-rundir=/var/run/dovecot \
+  --with-rundir=/var/run/${name} \
+  --with-statedir=/var/lib/${name} \
   --without-docs \
   --with-sql \
   --with-gssapi=yes \
@@ -1534,6 +1542,8 @@ build_dovecot()
 
  mkdir_as_root ${PREFIX}/${name}/conf/${name}
  mkdir_as_root /var/run/${name}
+ mkdir_as_root /var/lib/${name}
+ chmod_as_root 0750 /var/lib/${name}
 
  create_user dovecot 10104 "Dovecot IMAP Server" /var/run/${name}
  create_user dovenull 10105 "Dovecot Null User" /var/run/${name}
