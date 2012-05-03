@@ -278,6 +278,22 @@ set_cflags()
  export CFLAGS CXXFLAGS LIBSUFFIX
 }
 
+# download function using wget
+download()
+{
+ local url=$1
+ local output=$2
+
+ if [ ! -x /usr/bin/wget ]; then
+    get_package wget
+ fi
+
+ echo -ne "    "
+ wget --progress=dot "${url}" -O "${output}" 2>&1 | grep --line-buffered "%" | sed -u -e "s,\.,,g" | awk '{printf("\b\b\b\b%4s", $2)}'
+ echo -ne "\b\b\b\b"
+ echo " DONE"
+}
+
 # download package source
 get_pkg()
 {
@@ -288,13 +304,9 @@ get_pkg()
 
  [ -d ${srcdir} ] || mkdir -p ${srcdir}
 
- if [ ! -x /usr/bin/curl ]; then
-    get_package curl
- fi
-
  if [ ! -e ${srcdir}/${src} ]; then
-    msg info "Fetching source archive ${src} from ${url} ..."
-    /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${srcdir}/${src}" "${url}" || { msg error "Failed to download ${src} from ${url}."; exit 1; }
+    echo -ne "${NAME}: info: Fetching source archive ${src}: "
+    download "${url}" "${srcdir}/${src}"
  else
     msg warn "Source archive ${src} already exists."
  fi
@@ -325,13 +337,9 @@ get_patch()
 
  [ -d ${patchdir} ] || mkdir -p ${patchdir}
 
- if [ ! -x /usr/bin/curl ]; then
-    get_package curl
- fi
-
  if [ ! -e ${patchfile} ]; then
-    msg info "Fetching patch file ${patchfile} from ${url}/${patchname}"
-    /usr/bin/curl --tcp-nodelay -L -k -# -f -o "${patchfile}" "${url}/${patchname}" || { msg error "Failed to download patch ${patchname} from ${url}."; exit 1; }
+    echo -ne "${NAME}: info: Fetching patch file ${patchfile}: "
+    download "${url}/${patchname}" "${patchfile}"
  else
     msg warn "Patch file ${patchname} already exists."
  fi
@@ -792,20 +800,6 @@ need_nginx()
  if [ ! -x ${PREFIX}/nginx/sbin/nginx ]; then
    msg info "nginx is not available, we need it before building ${name}."
    trigger nginx
- fi
- export buildall=$localall
-}
-
-# trigger build of postfix, some packages need this
-need_postfix()
-{
- local name=$1
- local localall=$buildall
-
- export buildall=1
- if [ ! -x ${PREFIX}/postfix/sbin/postfix ]; then
-   msg info "postfix is not available, we need it before building ${name}."
-   trigger postfix
  fi
  export buildall=$localall
 }
@@ -1299,6 +1293,7 @@ build_postfix()
  local url="${POSTFIX_URL}"
  local queue="/var/spool/${name}"
  local lib="/var/lib/${name}"
+ local vmaildir="${DATA}/mail/vmail"
  local date=$(date "+%Y%m%d")
  local uid=$(id -u)
  local cmd=
@@ -1330,23 +1325,17 @@ build_postfix()
  fi
  if [ -e ${PREFIX}/${name}/conf/master.cf ]; then
     msg info "Backing up master.cf configuration file to master.cf.${date} ..."
-    cp_as_root ${PREFIX}/${name}/conf/master.cf cp_as_root ${PREFIX}/${name}/conf/master.cf.${date}
+    cp_as_root ${PREFIX}/${name}/conf/master.cf ${PREFIX}/${name}/conf/master.cf.${date}
  fi
 
  do_configure ${name}
 
- if ! getent group postdrop >/dev/null 2>&1; then
-     groupadd -g 10102 postdrop >/dev/null >/dev/null 2>&1 || { msg error "Failed to create group postdrop."; exit 1; }
- fi
- if ! getent passwd spamfilter >/dev/null 2>&1; then
-     useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/bash -r spamfilter >/dev/null 2>&1 || { msg error "Failed to create user ${user}."; exit 1; }
- fi
- create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
-
  cd lib
   for i in dns global master tls util milter; do
      ln -sf lib${i}.a lib${name}-${i}.so.1.0.1
+     ln -sf lib${name}-${i}.so.1.0.1 lib${name}-${i}.so.1
      ln -sf lib${i}.a lib${i}.so.1.0.1
+     ln -sf lib${i}.a lib${i}.so.1
   done
  cd ..
 
@@ -1357,8 +1346,20 @@ build_postfix()
  strip_dir ${PREFIX}/${name}
  export LD_LIBRARY_PATH=
 
- [ -d ${lib} ] || mkdir_as_root ${lib}
- [ -d ${queue} ] || mkdir_as_root ${queue}
+ if ! getent group postdrop >/dev/null 2>&1; then
+     groupadd -g 10102 postdrop >/dev/null >/dev/null 2>&1 || { msg error "Failed to create group postdrop."; exit 1; }
+ fi
+ if ! getent passwd spamfilter >/dev/null 2>&1; then
+     useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/false -r spamfilter >/dev/null 2>&1 || { msg error "Failed to create user ${user}."; exit 1; }
+ fi
+ create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
+ create_user vmail 10106 "Virtual Mailbox" ${vmaildir}
+ $cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
+ $cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
+
+ mkdir_as_root ${lib}
+ mkdir_as_root ${queue}
+ mkdir_as_root ${vmaildir}
 
  for dir in active bounce corrupt defer deferred flush \
    hold incoming maildrop pid private public saved trace; do
@@ -1372,6 +1373,8 @@ build_postfix()
  chown_as_root postfix postdrop ${queue}/public
  chown_as_root postfix postdrop ${queue}/maildrop
  chown_as_root postfix root ${lib}
+ chown_as_root vmail root ${vmaildir}
+ chmod_as_root 0770 ${vmaildir}
  chmod_as_root 2755 ${PREFIX}/${name}/sbin/postqueue
  chmod_as_root 2755 ${PREFIX}/${name}/sbin/postdrop
  chmod_as_root 0770 ${queue}/maildrop
@@ -1492,9 +1495,6 @@ build_dovecot()
  # we need to make sure mysql is already installed.
  need_mysql ${name}
 
- # we need to make sure postfix is already installed.
- need_postfix ${name}
-
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
@@ -1528,16 +1528,9 @@ build_dovecot()
 
  mkdir_as_root ${PREFIX}/${name}/conf/${name}
  mkdir_as_root /var/run/${name}
- mkdir_as_root ${DATA}/mail/vmail
 
  create_user dovecot 10104 "Dovecot IMAP Server" /var/run/${name}
  create_user dovenull 10105 "Dovecot Null User" /var/run/${name}
- create_user vmail 10106 "Virtual Mailbox" ${DATA}/mail/vmail
- $cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
- $cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
-
- chown_as_root vmail root ${DATA}/mail/vmail
- chmod_as_root 0770 ${DATA}/mail/vmail
 
  if [ ! -e ${PREFIX}/${name}/conf/${name}/${name}.conf ]; then
     msg info "Copying new configuration file for ${name} (${name}.conf) ..."
