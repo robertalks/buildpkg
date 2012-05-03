@@ -436,16 +436,14 @@ do_configure()
      -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
      -DHAS_MYSQL -I${PREFIX}/mysql/include \
-     -DHAS_SQLITE" \
+     -Wno-comments" \
     AUXLIBS=" \
      -L${PREFIX}/mysql/lib \
      -Wl,-rpath ${PREFIX}/mysql/lib \
      -lpcre \
      -lsasl2 \
      -lssl -lcrypto \
-     -lmysqlclient -lz -lm -lrt -ldl \
-     -lsqlite3 -lpthread \
-     -Wno-comments" \
+     -lmysqlclient -lsqlite3 -lresolv" \
     OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  fi
 }
