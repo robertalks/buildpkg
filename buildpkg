@@ -288,10 +288,10 @@ download()
     get_package wget
  fi
 
- echo -ne "    "
- wget --progress=dot "${url}" -O "${output}" 2>&1 | grep --line-buffered "%" | sed -u -e "s,\.,,g" | awk '{printf("\b\b\b\b%4s", $2)}'
+ echo -n "    "
+ /usr/bin/wget --progress=dot "${url}" -O "${output}" 2>&1 | grep --line-buffered "%" | sed -u -e "s,\.,,g" | awk '{printf("\b\b\b\b%4s", $2)}'
  echo -ne "\b\b\b\b"
- echo " DONE"
+ echo " 100%"
 }
 
 # download package source
@@ -299,25 +299,27 @@ get_pkg()
 {
  local url=$1
  local src=$2
- local cwd=${CWD}
- local srcdir=${cwd}/sources
+ local srcdir="${CWD}/sources"
+ local localpwd="$(pwd)"
 
  [ -d ${srcdir} ] || mkdir -p ${srcdir}
+ cd ${srcdir}
 
- if [ ! -e ${srcdir}/${src} ]; then
-    echo -ne "${NAME}: info: Fetching source archive ${src}: "
-    download "${url}" "${srcdir}/${src}"
+ if [ ! -e ${src} ]; then
+    echo -n "${NAME}: info: Fetching source archive ${src}: "
+    download "${url}" "${src}"
  else
     msg warn "Source archive ${src} already exists."
  fi
+
+ cd ${localpwd}
 }
 
 # unpack package source
 unpack_source()
 {
  local tarname=$1
- local cwd=${CWD}
- local srcdir=${cwd}/sources
+ local srcdir="${CWD}/sources"
 
  if [ ! -e ${srcdir}/${tarname} ]; then
     msg error "${tarname}: not found."
@@ -332,17 +334,22 @@ get_patch()
 {
  local url=$1
  local patchname=$2
- local patchdir="$CWD/patches"
+ local patchdir="${CWD}/patches"
  local patchfile="${patchdir}/${patchname}"
+ local localpwd="$(pwd)"
 
  [ -d ${patchdir} ] || mkdir -p ${patchdir}
+ cd ${patchdir}
 
- if [ ! -e ${patchfile} ]; then
-    echo -ne "${NAME}: info: Fetching patch file ${patchfile}: "
-    download "${url}/${patchname}" "${patchfile}"
+ url="${url}/${patchname}"
+ if [ ! -e ${patchname} ]; then
+    echo -ne "${NAME}: info: Fetching patch file ${patchname}: "
+    download "${url}" "${patchname}"
  else
     msg warn "Patch file ${patchname} already exists."
  fi
+
+ cd ${localpwd}
 }
 
 # apply patch
@@ -443,7 +450,8 @@ do_configure()
      -lpcre \
      -lsasl2 \
      -lssl -lcrypto \
-     -lmysqlclient -lsqlite3 -lresolv" \
+     -lmysqlclient -lsqlite3 \
+     -lpthread -lz -lm -lrt -ldl -lresolv" \
     OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  fi
 }
