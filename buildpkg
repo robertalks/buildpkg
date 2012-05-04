@@ -953,6 +953,8 @@ build_mysql()
     db_install=0
  fi
 
+ cd $CWD
+
  if [ ${buildall} -eq 0 ]; then
     trigger pam_mysql
     trigger dovecot
@@ -960,7 +962,6 @@ build_mysql()
     trigger php
  fi
 
- cd $CWD
 }
 
 # build and install nginx
@@ -1196,11 +1197,12 @@ build_php()
 
  start_service ${name}-fpm
 
+ cd $CWD
+
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
  fi
 
- cd $CWD
 }
 
 # build and install monit
