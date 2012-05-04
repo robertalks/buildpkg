@@ -816,6 +816,20 @@ need_nginx()
  export buildall=$localall
 }
 
+# trigger build of clamav, some packages need this
+need_clamav()
+{
+ local name=$1
+ local localall=$buildall
+
+ export buildall=1
+ if [ ! -x ${PREFIX}/clamav/sbin/clamd ]; then
+   msg info "clamav is not available, we need it before building ${name}."
+   trigger clamav
+ fi
+ export buildall=$localall
+}
+
 # build and install mysql server
 build_mysql()
 {
@@ -1702,6 +1716,15 @@ build_clamsmtp()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${CLAMSMTP_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ # we need to make sure clamav is already installed.
+ need_clamav ${name}
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1717,12 +1740,38 @@ build_clamsmtp()
 
  do_configure ${name} "--disable-dependency-tracking"
 
+ stop_service ${name}
+
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
  mkdir_as_root ${PREFIX}/${name}/conf
- mkdir_as_root ${PREFIX}/${name}/run 0750
- chown_as_root clamav root ${PREFIX}/${name}/run
+ mkdir_as_root /var/run/${name}
+ chown_as_root clamav root /var/run/${name}
+ chmod_as_root 0755 /var/run/${name}
+
+ if [ ! -e ${PREFIX}/${name}/conf/${name}d.conf ]; then
+    msg info "Copying new configuration file for ${name} (${name}d.conf) ..."
+    cp_as_root $CWD/config.d/${name}d.conf ${PREFIX}/${name}/conf/${name}d.conf
+    chown_as_root root root ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/${name}d.conf ] && \
+    $cmd sed -i \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/${name}/conf/${name}d.conf >/dev/null 2>&1
+ fi
+
+ if [ ! -e /etc/init.d/${name} ]; then
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+    cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+    chown_as_root root root /etc/init.d/${name}
+    chmod_as_root 0755 /etc/init.d/${name}
+    [ -e /etc/init.d/${name} ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      /etc/init.d/${name} >/dev/null 2>&1
+ fi
+
+ start_service ${name}
 
  cd $CWD
 }

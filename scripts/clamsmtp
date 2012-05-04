@@ -11,11 +11,9 @@
 ### END INIT INFO
 
 prefix=@@PREFIX@@
-DAEMON=${prefix}/sbin/clamsmtpd
+DAEMON=@@PREFIX@@/sbin/clamsmtpd
 NAME=clamsmtp
-DESC=clamsmtp
-USER=clamav
-PIDFILE=/appls/clamsmtp/run/$NAME.pid
+PIDFILE=/var/run/clamsmtp/$NAME.pid
 DAEMON_OPTS="-p ${PIDFILE}"
 
 PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -24,9 +22,19 @@ set -e
 
 . /lib/lsb/init-functions
 
+sanity()
+{
+ local user=clamav
+ [ -d /var/run/clamsmtp ] || mkdir -m 0755 -p /var/run/clamsmtp
+ chown ${user} /var/run/clamsmtp
+}
+
 start_clamsmtp()
 {
- log_daemon_msg "Starting ClamSMTP" "$DESC"
+ # do a sanity check first
+ sanity
+
+ log_daemon_msg "Starting ClamSMTP" "$NAME"
  if start-stop-daemon --start --quiet --pidfile ${PIDFILE} \
                 --exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
    log_end_msg 0
@@ -37,7 +45,7 @@ fi
 
 stop_clamsmtp()
 {
- log_daemon_msg "Stopping ClamSMTP" "$DESC"
+ log_daemon_msg "Stopping ClamSMTP" "$NAME"
  if start-stop-daemon --stop --quiet --pidfile ${PIDFILE} \
                 --exec $DAEMON >/dev/null 2>&1; then
    log_end_msg 0
@@ -48,7 +56,7 @@ stop_clamsmtp()
 
 reload_clamsmtp()
 {
- log_daemon_msg "Reloading ClamSMTP configuration" "$DESC"
+ log_daemon_msg "Reloading ClamSMTP configuration" "$NAME"
  if start-stop-daemon --stop --signal HUP --quiet --pidfile ${PIDFILE} \
                 --exec $DAEMON >/dev/null 2>&1; then
    log_end_msg 0
