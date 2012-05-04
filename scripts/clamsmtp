@@ -11,7 +11,7 @@
 ### END INIT INFO
 
 prefix=@@PREFIX@@
-DAEMON=@@PREFIX@@/sbin/clamsmtpd
+DAEMON=${prefix}/sbin/clamsmtpd
 NAME=clamsmtp
 PIDFILE=/var/run/clamsmtp/$NAME.pid
 DAEMON_OPTS="-p ${PIDFILE}"
