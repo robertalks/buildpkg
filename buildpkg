@@ -1238,6 +1238,7 @@ build_monit()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+ apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
 
  do_configure ${name} \
  "--program-prefix= \
@@ -1250,7 +1251,24 @@ build_monit()
  strip_dir ${PREFIX}/${name}
 
  [ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
- [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0750
+ [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0700
+ if [ ! -e ${PREFIX}/${name}/conf/${name}.conf ]; then
+    msg info "Copying new configuration file for ${name} (${name}.conf) ..."
+    cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
+    chown_as_root root root ${PREFIX}/${name}/conf
+    chmod_as_root 0600 ${PREFIX}/${name}/conf/${name}.conf
+ fi
+
+ if [ ! -e /etc/init.d/${name} ]; then
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+    cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+    chown_as_root root root /etc/init.d/${name}
+    chmod_as_root 0755 /etc/init.d/${name}
+    [ -e /etc/init.d/${name} ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      /etc/init.d/${name} >/dev/null 2>&1
+ fi
 
  start_service ${name}
 
