@@ -34,7 +34,7 @@ usage()
 ${NAME} script ${VERSION}
 Report bugs at <robert@linux-source.org>
 
-Usage: ${name} [options...]
+Usage: ${NAME} [options...]
 
   OPTIONS:
     --help              display this message.
@@ -43,9 +43,9 @@ Usage: ${name} [options...]
     --all               build all available packages.
 
   EXAMPLE:
-    ${name} --pkg=mysql (build mysql package)
+    ${NAME} --pkg=mysql (build mysql package)
       or
-    ${name} --all (build all packages available)
+    ${NAME} --all (build all packages available)
 
   AVAILABLE PACKAGES:
     ${PACKAGES}
