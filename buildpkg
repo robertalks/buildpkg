@@ -23,6 +23,7 @@ dovecotdeps="build-essential intltool libtool libdb-dev libldap2-dev libsasl2-de
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
+pam_mysqldeps="libpam0g-dev"
 
 export buildall=0
 export triggeroff=0
@@ -1809,6 +1810,8 @@ build_pam_mysql()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
+
+ get_dependency ${name}
 
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
