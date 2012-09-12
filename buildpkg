@@ -1063,6 +1063,7 @@ build_nginx()
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       -e "s|@@HOST@@|${HOST}|g" \
       -e "s|@@DATA@@|${DATA}/www/${HOST}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/sites.d/${HOST}.conf >/dev/null 2>&1
     msg info "Copying PHP example file for ${name} (index.php) ..."
     cp_as_root $CWD/config.d/nginx-test-pages/index.php ${DATA}/www/${HOST}/index.php
@@ -1193,6 +1194,7 @@ build_php()
     [ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && \
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
       ${PREFIX}/${name}/conf/${name}-fpm.conf >/dev/null 2>&1
     $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
     chown_as_root root root ${PREFIX}/${name}/conf
@@ -1916,6 +1918,7 @@ build_phpmyadmin()
      $cmd sed -i \
        -e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
        -e "s|@@DATA@@|${DATA}/www/${name}|g" \
+       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
        ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
      chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
   fi
