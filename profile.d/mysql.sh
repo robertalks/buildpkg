@@ -1,5 +1,5 @@
-# Update PATH to include @PREFIX@/bin
+# Update PATH to include @@PREFIX@@/bin
 
-PATH="@PREFIX@/bin:$PATH"
+PATH="@@PREFIX@@/bin:$PATH"
 
 export PATH

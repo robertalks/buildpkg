@@ -948,6 +948,18 @@ build_mysql()
    msg info "MySQL database found, we wont do nothing."
  fi
 
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
  start_service ${name}
 
  if [ $db_install -eq 1 ]; then
@@ -1086,6 +1098,18 @@ build_nginx()
       /etc/init.d/${name} >/dev/null 2>&1
  fi
 
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
  start_service ${name}
 
  cd $CWD
@@ -1212,6 +1236,18 @@ build_php()
       /etc/init.d/${name}-fpm >/dev/null 2>&1
  fi
 
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
  start_service ${name}-fpm
 
  cd $CWD
@@ -1271,6 +1307,18 @@ build_monit()
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       /etc/init.d/${name} >/dev/null 2>&1
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
  fi
 
  start_service ${name}
@@ -1470,6 +1518,18 @@ build_postfix()
       ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
  fi
 
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
  start_service ${name}
 
  cd $CWD
@@ -1521,6 +1581,18 @@ build_greyfix()
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       -e "s|@@HOST@@|${HOST}|g" \
       ${PREFIX}/${name}/sbin/autogrey >/dev/null 2>&1
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
  fi
 
  cd $CWD
@@ -1609,6 +1681,18 @@ build_dovecot()
     $cmd sed -i \
       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
       /etc/init.d/${name} >/dev/null 2>&1
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
  fi
 
  start_service ${name}
@@ -1721,6 +1805,18 @@ build_clamav()
     if [ $? -ne 0 ]; then
        msg warn "something happened, wasnt able to update anti-virus definitions."
     fi
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
  fi
 
  start_service ${name}-clamd

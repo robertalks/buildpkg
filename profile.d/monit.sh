@@ -3,7 +3,7 @@
 _UID=$(id -u)
 
 if [ $_UID -eq 0 ]; then
-  PATH="@@PREFIX@@/sbin:$PATH"
+  PATH="@@PREFIX@@/bin:$PATH"
   export PATH
 fi
 
