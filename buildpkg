@@ -1018,6 +1018,7 @@ build_nginx()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+ apply_patch $CWD/patches/nginx-drop-server-name.patch.gz 1
 
  do_configure ${name} \
  "--with-http_ssl_module \
