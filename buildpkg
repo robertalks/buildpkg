@@ -671,7 +671,7 @@ ld_add()
  local uid=$(id -u)
  local content=$1
  local name=$2
- local cmd=""
+ local cmd="sh -c"
 
  if [ $uid -ne 0 ]; then
     cmd="sudo ${cmd}"
@@ -680,8 +680,7 @@ ld_add()
  [ -d /etc/ld.so.conf.d ] || mkdir_as_root /etc/ld.so.conf.d
 
  if [ ! -e /etc/ld.so.conf.d/${name}.conf ]; then
-    $cmd="${cmd} echo ${content} > /etc/ld.so.conf.d/${name}.conf"
-    $cmd 2>/dev/null || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
+    $cmd "echo ${content} > /etc/ld.so.conf.d/${name}.conf" 2>/dev/null || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
  fi
 }
 
