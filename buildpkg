@@ -1197,9 +1197,7 @@ build_nginx()
 
  mkdir_as_root ${wwwlog} 0770
  chown_as_root www root ${wwwlog}
-
  mkdir_as_root ${wwwdir} 0755
- chown_as_root root root ${wwwdir}
 
  if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
     mkdir_as_root ${PREFIX}/${name}/conf/sites.d
@@ -1560,12 +1558,12 @@ build_eaccelerator()
  export PATH="${PREFIX}/php/bin:$PATH"
  ${PREFIX}/php/bin/phpize >/dev/null 2>&1 || { msg error "Failed while running ${PREFIX}/php/bin/phpize."; exit 1; }
 
- do_configure ${name} "--enable-eaccelerator=shared"
+ do_configure ${name} "--enable-eaccelerator"
 
  stop_service php-fpm
-
  run_make ${name}
  strip_dir ${PREFIX}/php
+ rm_as_root ${TMPSRV}/php/eaccelerator/*
 
  [ -d ${PREFIX}/php/conf/conf.d ] || mkdir_as_root ${PREFIX}/php/conf/conf.d
  if [ ! -e ${PREFIX}/php/conf/conf.d/eaccelerator.ini ]; then
