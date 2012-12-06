@@ -273,16 +273,16 @@ get_dependency()
 # set build CFLAGS/CXXFLAGS flags
 set_cflags()
 {
- [ -z "$CFLAGS" ] && CFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
+ [ -z "$CFLAGS" ] && CFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer" 
  [ -z "$CXXFLAGS" ] && CXXFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
 
  if [ "$ARCH" = "x86_64" ]; then
-    CFLAGS="$CFLAGS -m64"
-    CXXFLAGS="$CXXFLAGS -m64"
+    CFLAGS="$CFLAGS -mtune=native -m64 -ftree-vectorize -mfpmath=sse"
+    CXXFLAGS="$CXXFLAGS -mtune=native -m64 -ftree-vectorize -mfpmath=sse"
     LIBSUFFIX="64"
  else
-    CFLAGS="$CFLAGS -march=i486 -mtune=i686 -m32"
-    CXXFLAGS="$CXXFLAGS -march=i486 -mtune=i686 -m32"
+    CFLAGS="$CFLAGS -march=i686 -mtune=native -m32 -msse2 -mfpmath=sse"
+    CXXFLAGS="$CXXFLAGS -march=i686 -mtune=native -m32 -msse2 -mfpmath=sse"
     LIBSUFFIX=""
  fi
 
