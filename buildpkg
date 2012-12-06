@@ -282,7 +282,7 @@ set_cflags()
     LIBSUFFIX="64"
  else
     CFLAGS="$CFLAGS -march=i686 -mtune=native -m32 -msse2 -mfpmath=sse"
-    CXXFLAGS="$CXXFLAGS -march=i686 -mtune=native -m32 -msse2 -mfpmath=sse"
+    CXXFLAGS="$CXXFLAGS -march=i686 -mtune=native -m31 -msse2 -mfpmath=sse"
     LIBSUFFIX=""
  fi
 
