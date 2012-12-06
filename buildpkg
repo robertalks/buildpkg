@@ -5,9 +5,11 @@ VERSION=1.0.1
 CWD=$(pwd)
 
 # Do not modify this, this are the only supported applications.
-PACKAGES="mysql nginx php eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin monit"
+PACKAGES="mysql mongodb nginx php php_mongo eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin monit"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev"
+mongodbdeps="scons g++-4.4 xulrunner-dev fontconfig fontconfig-config intltool binutils libpcap-dev libpcre3-dev libboost-dev libreadline-dev python-dev libssl-dev libstdc++6-4.4-dev \
+libboost-thread-dev libboost-filesystem-dev libboost-program-options-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
@@ -100,8 +102,10 @@ set_global_conf()
  [ -z "$MYSQL_ROOT_PASSWORD" ] && MYSQL_ROOT_PASSWORD="C00lCat"
 
  [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$MONGODB_VERSION" ] && { msg error "MONGODB_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$PHP_MONGO_VERSION" ] && { msg error "PHP_MONGO_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$EACCELERATOR_VERSION" ] && { msg error "EACCELERATOR_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -115,8 +119,10 @@ set_global_conf()
  [ -z "$VDA_PATCH_VERSION" ] && { msg error "VDA_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
  MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
+ MONGODB_URL="http://downloads.mongodb.org/src/mongodb-src-r${MONGODB_VERSION}.tar.gz"
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
  PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
+ PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
  EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.its.cz/MIRRORS/ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
@@ -149,8 +155,10 @@ set_global_conf()
  # We need the proper versions of the applications which we want to build.
  export \
  MYSQL_VERSION \
+ MONGODB_VERSION \
  NGINX_VERSION \
  PHP_VERSION \
+ PHP_MONGO_VERSION \
  EACCELERATOR_VERSION \
  MONIT_VERSION \
  POSTFIX_VERSION \
@@ -165,8 +173,10 @@ set_global_conf()
  VDA_PATCH_VERSION
  export \
  MYSQL_URL \
+ MONGODB_URL \
  NGINX_URL \
  PHP_URL \
+ PHP_MONGO_URL \
  EACCELERATOR_URL \
  MONIT_URL \
  POSTFIX_URL \
@@ -267,12 +277,12 @@ set_cflags()
  [ -z "$CXXFLAGS" ] && CXXFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
 
  if [ "$ARCH" = "x86_64" ]; then
-    CFLAGS="$CFLAGS"
-    CXXFLAGS="$CXXFLAGS"
+    CFLAGS="$CFLAGS -m64"
+    CXXFLAGS="$CXXFLAGS -m64"
     LIBSUFFIX="64"
  else
-    CFLAGS="$CFLAGS -march=i486 -mtune=i686"
-    CXXFLAGS="$CXXFLAGS -march=i486 -mtune=i686"
+    CFLAGS="$CFLAGS -march=i486 -mtune=i686 -m32"
+    CXXFLAGS="$CXXFLAGS -march=i486 -mtune=i686 -m32"
     LIBSUFFIX=""
  fi
 
@@ -381,7 +391,6 @@ apply_patch()
     fi
     if [ "$cmd" != "" ]; then
        [ -d ${logdir} ] || mkdir -p ${logdir}
-       [ -e ${logfile} ] && rm -f ${logfile} || :
        msg info "Applying patch file ${patch_file} with strip option -p${strip}."
        msg info "Logfile saved in ${logfile}"
        $cmd ${patch_file} | patch -p${strip} >> ${logfile} 2>&1
@@ -475,18 +484,29 @@ run_make()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- msg info "Compiling ${name} source (make -j${MAKEJOBS})"
- msg info "Logfile saved in ${logfile}"
- make -j"${MAKEJOBS}" >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+ SCONS_OPT="--nostrip --full --ssl --release --use-system-pcre --use-system-boost" 
+ if [ "$ARCH" = "x86_64" ]; then
+   SCONS_OPT="${SCONS_OPT} --64"
+ else
+   SCONS_OPT="${SCONS_OPT} --32"
+ fi
+
+ if [ "${name}" = "mongodb" ]; then
+    msg info "Running $ARCH architecture, without compiler flags."
+    msg info "Compiling ${name} source (scons -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name})"
+    msg info "Logfile saved in ${logfile}"
+    scons -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+ else 
+    msg info "Compiling ${name} source (make -j${MAKEJOBS})"
+    msg info "Logfile saved in ${logfile}"
+    make -j${MAKEJOBS} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+ fi
 
  if [ $uid -ne 0 ]; then
     cmd="sudo"
  fi
 
- if [ "${name}" != "postfix" ]; then
-    msg info "Installing ${name} from compiled source (make install)"
-    $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
- else
+ if [ "${name}" = "postfix" ]; then
     msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
     $cmd sh ./postfix-install -non-interactive \
        install_root="${PREFIX}/${name}" \
@@ -499,7 +519,15 @@ run_make()
        mail_owner="postfix" \
        setgid_group="postdrop" \
        manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+ elif [ "${name}" = "mongodb" ]; then
+   msg info "Installing ${name} from compiled source (scons install ${SCONS_OPT} --prefix=${PREFIX}/${name})"
+   $cmd scons install \
+       ${SCONS_OPT} --prefix=${PREFIX}/${name} install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+ else
+   msg info "Installing ${name} from compiled source (make install)"
+   $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
  fi
+
 }
 
 # change ownership to running user
@@ -632,7 +660,8 @@ ldconfig()
  if [ $uid -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
-
+ 
+ msg info "Running ldconfig -r / ..."
  $cmd >/dev/null 2>&1 || msg error "Failed to run ldconfig -r /"
 }
 
@@ -642,14 +671,17 @@ ld_add()
  local uid=$(id -u)
  local content=$1
  local name=$2
- local cmd="echo ${content} > /etc/ld.so.conf.d/${name}.conf"
+ local cmd=""
 
  if [ $uid -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
+ 
+ [ -d /etc/ld.so.conf.d ] || mkdir_as_root /etc/ld.so.conf.d
 
  if [ ! -e /etc/ld.so.conf.d/${name}.conf ]; then
-    $cmd >/dev/null 2>&1 || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
+    $cmd="${cmd} echo ${content} > /etc/ld.so.conf.d/${name}.conf"
+    $cmd 2>/dev/null || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
  fi
 }
 
@@ -789,6 +821,20 @@ need_mysql()
  export buildall=$localall
 }
 
+# trigger build of mongodb, very important
+need_mongodb()
+{
+ local name=$1
+ local localall=$buildall
+
+ export buildall=1
+ if [ ! -x ${PREFIX}/mongodb/sbin/mongod ]; then
+   msg info "MongoDB is not installed, we need it before building ${name}."
+   trigger mongodb
+ fi
+ export buildall=$localall
+}
+
 # trigger build of php, some packages need this
 need_php()
 {
@@ -839,7 +885,7 @@ build_mysql()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${MYSQL_URL}"
- local mylogdir="${MYDB}/log"
+ local mylogdir="${MYDB}/log/${name}"
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
  local dbdir="${MYDB}/${name}"
@@ -867,7 +913,7 @@ build_mysql()
  "-DDEFAULT_CHARSET=utf8 \
   -DDEFAULT_COLLATION=utf8_general_ci \
   -DWITH_EXTRA_CHARSETS=complex \
-  -DWITH_EMBEDDED_SERVER=ON \
+  -DWITH_EMBEDDED_SERVER=OFF \
   -DWITH_INNOBASE_STORAGE_ENGINE=1 \
   -DWITH_PARTITION_STORAGE_ENGINE=1 \
   -DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
@@ -878,11 +924,14 @@ build_mysql()
   -DWITH_DEBUG=OFF \
   -DWITH_PERFSCHEMA_STORAGE_ENGINE=OFF \
   -DWITH_UNIT_TESTS=OFF \
-  -DENABLED_PROFILING=ON \
+  -DENABLED_PROFILING=OFF \
   -DWITH_READLINE=ON \
   -DWITH_ZLIB=system \
   -DWITH_SSL=system \
   -DWITH_LIBWRAP=OFF \
+  -DINSTALL_SBINDIR=libexec \
+  -DINSTALL_LIBDIR="lib${LIBSUFFIX}" \
+  -DINSTALL_PLUGINDIR="lib${LIBSUFFIX}/mysql/plugin" \
   -DINSTALL_MYSQLDATADIR=${dbdir} \
   -DMYSQL_DATADIR=${dbdir} \
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock \
@@ -896,6 +945,10 @@ build_mysql()
  strip_dir ${PREFIX}/${name}
  create_user mysql 10101 "MySQL Server" ${dbdir}
 
+ if [ "$ARCH" = "x86_64" ]; then
+    ln_as_root ${PREFIX}/${name}/lib${LIBDIRSUFFIX} ${PREFIX}/${name}/lib
+ fi
+
  [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
  chown_as_root mysql mysql ${dbdir}
  [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
@@ -903,13 +956,16 @@ build_mysql()
 
  ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
 
- ld_add "${PREFIX}/${name}/lib" ${name}
+ ld_add "${PREFIX}/${name}/lib${LIBDIRSUFFIX}" ${name}
  ldconfig
 
  mkdir_as_root $TMPSRV 0777
  chown_as_root root root $TMPSRV
 
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+ mv_as_root ${PREFIX}/${name}/bin/mysqlaccess.conf ${PREFIX}/${name}/conf/mysqlaccess.conf
+ chmod_as_root 0644 ${PREFIX}/${name}/conf/mysqlaccess.conf
+
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
     msg info "Copying new configuration file for ${name} (my.cnf) ..."
     cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
@@ -991,6 +1047,100 @@ build_mysql()
 
 }
 
+# build and install mongodb server
+build_mongodb()
+{
+ local name="mongodb"
+ local version="${MONGODB_VERSION}"
+ local tarball="${name}-src-r${version}.tar.gz"
+ local dir="${name}-src-r${version}"
+ local url="${MONGODB_URL}"
+ local mylogdir="${MYDB}/log/${name}"
+ local logdir=$CWD/log
+ local dbdir="${MYDB}/${name}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${dir} ] && rm -fr ${dir} || :
+
+ get_dependency ${name}
+
+ get_pkg ${url} ${tarball}
+ unpack_source ${tarball}
+ chown_dir ${dir}
+ cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+ apply_patch $CWD/patches/${name}_change-compiler-flags.patch.gz 1
+ apply_patch $CWD/patches/${name}_rename-unixSocketPrefix-to-socketpath.patch.gz 1
+ sed -i "s|/data/db/|${dbdir}|" src/mongo/db/pdfile.cpp
+ chmod_as_root 0644 README
+ chmod_as_root 0644 src/mongo/db/security.h
+
+ stop_service ${name}
+
+ run_make ${name}
+ strip_dir ${PREFIX}/${name}
+
+ [ -d ${PREFIX}/${name}/sbin ] || mkdir_as_root ${PREFIX}/${name}/sbin 0755
+ mv_as_root ${PREFIX}/${name}/bin/mongod ${PREFIX}/${name}/sbin/mongod
+
+ if [ "$ARCH" = "x86_64" ]; then
+   rm_as_root ${PREFIX}/${name}/lib
+   ln_as_root ${PREFIX}/${name}/lib${LIBSUFFIX} ${PREFIX}/${name}/lib
+ fi
+
+ create_user mongodb 10109 "MondoDB Server" ${dbdir}
+
+ [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
+ chown_as_root mongodb mongodb ${dbdir}
+ [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
+ chown_as_root mongodb mongodb ${mylogdir}
+
+ [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+ if [ ! -e ${PREFIX}/${name}/conf/mongod.conf ]; then
+    msg info "Copying new configuration file for ${name} (mongod.conf) ..."
+    cp_as_root $CWD/config.d/mongod.conf ${PREFIX}/${name}/conf/mongod.conf
+    chown_as_root root root ${PREFIX}/${name}/conf
+    [ -e ${PREFIX}/${name}/conf/mongod.conf ] && \
+    $cmd sed -i \
+      -e "s|@@MYDB@@|${MYDB}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      ${PREFIX}/${name}/conf/mongod.conf >/dev/null 2>&1
+ fi
+ if [ ! -e /etc/init.d/${name} ]; then
+    msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+    cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+    chown_as_root root root /etc/init.d/${name}
+    chmod_as_root 0755 /etc/init.d/${name}
+    [ -e /etc/init.d/${name} ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@MYDB@@|${MYDB}|g" \
+      /etc/init.d/${name} >/dev/null 2>&1
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
+ start_service ${name}
+
+ cd $CWD
+}
+
 # build and install nginx
 build_nginx()
 {
@@ -1050,7 +1200,7 @@ build_nginx()
  chown_as_root www root ${wwwlog}
 
  mkdir_as_root ${wwwdir} 0755
- chown_as_root www root ${wwwdir}
+ chown_as_root root root ${wwwdir}
 
  if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
     mkdir_as_root ${PREFIX}/${name}/conf/sites.d
@@ -1142,7 +1292,7 @@ build_php()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- get_patch http://download.suhosin.org suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz
+ # get_patch http://download.suhosin.org suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz
 
  unpack_source ${tarball}
  chown_dir ${dir}
@@ -1255,6 +1405,7 @@ build_php()
 
  if [ ${buildall} -eq 0 ]; then
     trigger eaccelerator
+    trigger php_mongo
  fi
 
 }
@@ -1327,6 +1478,59 @@ build_monit()
  cd $CWD
 }
 
+# build and install php_mongo
+build_php_mongo()
+{
+ local name="mongo"
+ local version="${PHP_MONGO_VERSION}"
+ local tarball="${name}-${version}.tgz"
+ local dir="${name}-${version}"
+ local url="${PHP_MONGO_URL}"
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ # we need to make sure php is already installed.
+ need_php ${name}
+ need_mongodb ${name}
+
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${dir} ] && rm -fr ${dir} || :
+
+ get_pkg ${url} ${tarball}
+ unpack_source ${tarball}
+ chown_dir ${dir}
+ cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ export PATH="${PREFIX}/php/bin:$PATH"
+ ${PREFIX}/php/bin/phpize >/dev/null 2>&1 || { msg error "Failed while running ${PREFIX}/php/bin/phpize."; exit 1; }
+
+ 
+ export CPPFLAGS="-I${PREFIX}/mongodb/include"
+ export LDFLAGS="-L${PREFIX}/mongodb/lib${LIBSUFFIX}"
+ do_configure ${name} "--enable-mongo"
+
+ stop_service php-fpm
+
+ run_make ${name}
+ strip_dir ${PREFIX}/php
+
+ [ -d ${PREFIX}/php/conf/conf.d ] || mkdir_as_root ${PREFIX}/php/conf/conf.d
+ if [ ! -e ${PREFIX}/php/conf/conf.d/mongo.ini ]; then
+    msg info "Copying new configuration file for ${name} (${name}.ini) ..."
+    cp_as_root $CWD/config.d/mongo.ini ${PREFIX}/php/conf/conf.d/mongo.ini
+    chown_as_root root root ${PREFIX}/php/conf/conf.d
+ fi
+
+ start_service php-fpm
+
+ cd $CWD
+}
+
 # build and install eaccelerator
 build_eaccelerator()
 {
@@ -1348,8 +1552,6 @@ build_eaccelerator()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
-
- get_dependency ${name}
 
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}

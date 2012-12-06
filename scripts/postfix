@@ -23,7 +23,7 @@ set -e
 
 start_postfix()
 {
- log_daemon_msg "Starting Postfix Mail Server" "$NAME"
+ log_daemon_msg "Starting Postfix mail server" "$NAME"
  if start-stop-daemon --start --exec $DAEMON -- start >/dev/null 2>&1; then
     log_end_msg 0
  else
@@ -33,7 +33,7 @@ start_postfix()
 
 stop_postfix()
 {
- log_daemon_msg "Stopping Postfix Mail Server" "$NAME"
+ log_daemon_msg "Stopping Postfix mail server" "$NAME"
  if ${DAEMON} stop >/dev/null 2>&1; then
     rm -f ${pidfile}
     log_end_msg 0
@@ -58,7 +58,7 @@ case "$1" in
   ;;
 
   reload)
-    echo -n "Reloading Postfix Mail Server configuration" "$NAME"
+    echo -n "Reloading Postfix mail server configuration" "$NAME"
     if ${DAEMON} reload >/dev/null 2>&1; then
        log_end_msg 0
     else

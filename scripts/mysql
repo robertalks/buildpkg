@@ -18,7 +18,7 @@ service_startup_timeout=900
 . /lib/lsb/init-functions
 ulimit -n 2048
 
-mysqld_pid_file_path="@@MYDB@@/log/mysql.pid"
+mysqld_pid_file_path="@@MYDB@@/log/mysql/mysql.pid"
 if test -z "${basedir}"
 then
   basedir="@@PREFIX@@"
@@ -28,7 +28,7 @@ then
     datadir="@@MYDB@@/mysql"
   fi
   sbindir="@@PREFIX@@/bin"
-  libexecdir="@@PREFIX@@/bin"
+  libexecdir="@@PREFIX@@/libexec"
 else
   bindir="/appls/mysql/bin"
   if test -z "${datadir}"
@@ -189,10 +189,10 @@ case "${mode}" in
     cd ${basedir}
     if test -s "${mysqld_pid_file_path}"
     then
-      log_failure_msg "MySQL Server seems to be running, or at least PID file exists and its not empty."
+      log_failure_msg "MySQL server seems to be running, or at least PID file exists and its not empty."
       exit 1
     else
-      log_daemon_msg "Starting MySQL Server" "$NAME"
+      log_daemon_msg "Starting MySQL server" "$NAME"
       if test -x ${bindir}/mysqld_safe
        then
          # Give extra arguments to mysqld with the my.cnf file. This script
@@ -212,7 +212,7 @@ case "${mode}" in
       mysqld_pid=$(cat "${mysqld_pid_file_path}")
       if (kill -0 ${mysqld_pid} 2>/dev/null)
       then
-        log_daemon_msg "Shutting down MySQL Server" "$NAME"
+        log_daemon_msg "Stopping down MySQL server" "$NAME"
         kill ${mysqld_pid}
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "${mysqld_pid}" "${mysqld_pid_file_path}"; return_value=$?

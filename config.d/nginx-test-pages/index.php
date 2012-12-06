@@ -1,3 +1,3 @@
 <?php
- echo "nginx and PHP works!"
+ echo "mini-http-server and PHP works!"
 ?>

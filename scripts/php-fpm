@@ -93,7 +93,7 @@ start_fpm()
 
 stop_fpm()
 {
- log_daemon_msg "Shutting down PHP FastCGI Process Manager" "$DESC"
+ log_daemon_msg "Stopping down PHP FastCGI Process Manager" "$DESC"
  if [ ! -r ${php_fpm_pid} ] ; then
     echo " warning, no pid file found - php-fpm is not running ?"
     exit 1

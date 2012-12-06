@@ -78,7 +78,7 @@ case "$1" in
   ;;
 
   reload)
-    echo -n "Reloading nginx http/https server configuration" "$DESC"
+     log_daemon_msg "Reloading nginx http/https server configuration" "$DESC"
     if start-stop-daemon --stop --signal HUP --quiet --pidfile /var/run/$NAME.pid \
           --exec $DAEMON >/dev/null 2>&1; then
        log_end_msg 0
