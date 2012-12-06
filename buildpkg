@@ -945,7 +945,7 @@ build_mysql()
  create_user mysql 10101 "MySQL Server" ${dbdir}
 
  if [ "$ARCH" = "x86_64" ]; then
-    ln_as_root ${PREFIX}/${name}/lib${LIBDIRSUFFIX} ${PREFIX}/${name}/lib
+    ln_as_root ${PREFIX}/${name}/lib${LIBSUFFIX} ${PREFIX}/${name}/lib
  fi
 
  [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
@@ -955,7 +955,7 @@ build_mysql()
 
  ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
 
- ld_add "${PREFIX}/${name}/lib${LIBDIRSUFFIX}" ${name}
+ ld_add "${PREFIX}/${name}/lib${LIBSUFFIX}" ${name}
  ldconfig
 
  mkdir_as_root $TMPSRV 0777
