@@ -1440,11 +1440,16 @@ build_monit()
 
  [ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0700
+
  if [ ! -e ${PREFIX}/${name}/conf/${name}.conf ]; then
     msg info "Copying new configuration file for ${name} (${name}.conf) ..."
     cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
     chown_as_root root root ${PREFIX}/${name}/conf
     chmod_as_root 0600 ${PREFIX}/${name}/conf/${name}.conf
+    [ -e ${PREFIX}/${name}/conf/${name}.conf ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      ${PREFIX}/${name}/conf/${name}.conf >/dev/null 2>&1
  fi
 
  if [ ! -e /etc/init.d/${name} ]; then
