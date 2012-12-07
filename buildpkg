@@ -965,6 +965,12 @@ build_mysql()
  mv_as_root ${PREFIX}/${name}/bin/mysqlaccess.conf ${PREFIX}/${name}/conf/mysqlaccess.conf
  chmod_as_root 0644 ${PREFIX}/${name}/conf/mysqlaccess.conf
 
+ [ -e ${PREFIX}/${name}/bin/mysqlaccess ] && \
+ $cmd sed -i \
+    -e "/\$script_conf/ s|${PREFIX}/${name}|${PREFIX}/${name}/conf|g" \
+    -e "/my.cnf/ s|${PREFIX}/${name}|${PREFIX}/${name}/conf|g" \
+    ${PREFIX}/${name}/bin/mysqlaccess
+
  if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
     msg info "Copying new configuration file for ${name} (my.cnf) ..."
     cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
