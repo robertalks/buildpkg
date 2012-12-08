@@ -39,7 +39,7 @@ start_mongodb()
 
 stop_mongodb()
 {
- log_daemon_msg "Stopping nginx http/https server" "$DESC"
+ log_daemon_msg "Stopping MongoDB server" "$DESC"
  if start-stop-daemon --stop --quiet --pidfile ${pidfile} \
                --user ${DAEMON_USER} --exec ${DAEMON} >/dev/null 2>&1; then
     log_end_msg 0
