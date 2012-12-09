@@ -945,7 +945,9 @@ build_mysql()
  create_user mysql 10101 "MySQL Server" ${dbdir}
 
  if [ "$ARCH" = "x86_64" ]; then
-    ln_as_root ${PREFIX}/${name}/lib${LIBSUFFIX} ${PREFIX}/${name}/lib
+    ( cd ${PREFIX}/${name}
+      ln_as_root lib${LIBSUFFIX} lib 
+    )
  fi
 
  [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
@@ -953,7 +955,9 @@ build_mysql()
  [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
  chown_as_root mysql mysql ${mylogdir}
 
- ln_as_root ${PREFIX}/${name}/bin/mysql_config /usr/bin/mysql_config
+ ( cd /usr/bin
+   ln_as_root ../../${PREFIX}/${name}/bin/mysql_config .
+ )
 
  ld_add "${PREFIX}/${name}/lib${LIBSUFFIX}" ${name}
  ldconfig
@@ -1096,7 +1100,9 @@ build_mongodb()
 
  if [ "$ARCH" = "x86_64" ]; then
    rm_as_root ${PREFIX}/${name}/lib
-   ln_as_root ${PREFIX}/${name}/lib${LIBSUFFIX} ${PREFIX}/${name}/lib
+   ( cd ${PREFIX}/${name}
+     ln_as_root lib${LIBSUFFIX} lib
+   )
  fi
 
  create_user mongodb 10109 "MondoDB Server" ${dbdir}
@@ -1701,11 +1707,17 @@ build_postfix()
  rm_as_root ${PREFIX}/${name}/{usr,var}
 
  for bin in ${PREFIX}/${name}/sbin/* ; do
-    ln_as_root ${PREFIX}/${name}/sbin/$(basename $bin) /usr/sbin/$(basename $bin)
+    ( cd /usr/sbin
+      ln_as_root ../../${PREFIX}/${name}/sbin/$(basename $bin) .
+    )
  done
- ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/newaliases
- ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/bin/mailq
- ln_as_root ${PREFIX}/${name}/sbin/sendmail /usr/lib/sendmail
+
+ ( cd /usr/bin
+   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail newaliases
+   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail mailq
+   cd /usr/lib
+   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail .
+ )
 
  if [ ! -e /etc/init.d/${name} ]; then
     msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
@@ -2211,7 +2223,11 @@ build_phpmyadmin()
 
  mkdir_as_root ${wwwdir}
  mkdir_as_root ${PREFIX}/${name}
- ln_as_root ${PREFIX}/${name} ${wwwdir}
+
+ ( cd ${wwwdir}
+   ln_as_root ../../${PREFIX}/${name} .
+ )
+
  $cmd cp -aRf * ${PREFIX}/${name}
 
  stop_service nginx
