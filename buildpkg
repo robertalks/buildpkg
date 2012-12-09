@@ -956,7 +956,7 @@ build_mysql()
  chown_as_root mysql mysql ${mylogdir}
 
  ( cd /usr/bin
-   ln_as_root ../../${PREFIX}/${name}/bin/mysql_config .
+   ln_as_root ../..${PREFIX}/${name}/bin/mysql_config .
  )
 
  ld_add "${PREFIX}/${name}/lib${LIBSUFFIX}" ${name}
@@ -1708,15 +1708,15 @@ build_postfix()
 
  for bin in ${PREFIX}/${name}/sbin/* ; do
     ( cd /usr/sbin
-      ln_as_root ../../${PREFIX}/${name}/sbin/$(basename $bin) .
+      ln_as_root ../..${PREFIX}/${name}/sbin/$(basename $bin) .
     )
  done
 
  ( cd /usr/bin
-   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail newaliases
-   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail mailq
+   ln_as_root ../..${PREFIX}/${name}/sbin/sendmail newaliases
+   ln_as_root ../..${PREFIX}/${name}/sbin/sendmail mailq
    cd /usr/lib
-   ln_as_root ../../${PREFIX}/${name}/sbin/sendmail .
+   ln_as_root ../..${PREFIX}/${name}/sbin/sendmail .
  )
 
  if [ ! -e /etc/init.d/${name} ]; then
@@ -2225,7 +2225,7 @@ build_phpmyadmin()
  mkdir_as_root ${PREFIX}/${name}
 
  ( cd ${wwwdir}
-   ln_as_root ../../${PREFIX}/${name} .
+   ln_as_root ../..${PREFIX}/${name} .
  )
 
  $cmd cp -aRf * ${PREFIX}/${name}
