@@ -527,6 +527,8 @@ run_make()
 
  if [ "${name}" = "php" ]; then
     stop_service ${name}-fpm
+ else
+    stop_service ${name}
  fi
 
  if [ "${name}" = "postfix" ]; then
