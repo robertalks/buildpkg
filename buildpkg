@@ -5,7 +5,7 @@ VERSION=1.0.1
 CWD=$(pwd)
 
 # Do not modify this, this are the only supported applications.
-PACKAGES="mysql mongodb nginx php php_mongo eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin monit"
+PACKAGES="mysql mongodb nginx php php_mongo eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin awstats monit"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev"
 mongodbdeps="scons g++-4.4 xulrunner-dev fontconfig fontconfig-config intltool binutils libpcap-dev libpcre3-dev libboost-dev libreadline-dev python-dev libssl-dev libstdc++6-4.4-dev \
@@ -26,6 +26,8 @@ spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
 pam_mysqldeps="libpam0g-dev"
+awstatsdeps="perl perl-modules"
+fcgiwrapdeps="libfcgi-dev automake autoconf"
 
 export buildall=0
 export triggeroff=0
@@ -104,6 +106,8 @@ set_global_conf()
  [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONGODB_VERSION" ] && { msg error "MONGODB_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$FCGIWRAP_VERSION" ] && { msg error "FCGIWRAP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$SPAWN_FCGI_VERSION" ] && { msg error "SPAWN_FCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_MONGO_VERSION" ] && { msg error "PHP_MONGO_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$EACCELERATOR_VERSION" ] && { msg error "EACCELERATOR_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -117,13 +121,17 @@ set_global_conf()
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$SUHOSIN_PATCH_VERSION" ] && { msg error "SUHOSIN_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$VDA_PATCH_VERSION" ] && { msg error "VDA_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
  MYSQL_URL="http://ftp.gwdg.de/pub/misc/mysql/Downloads/MySQL-5.5/mysql-${MYSQL_VERSION}.tar.gz"
  MONGODB_URL="http://downloads.mongodb.org/src/mongodb-src-r${MONGODB_VERSION}.tar.gz"
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
+ FCGIWRAP_URL="http://github.com/gnosek/fcgiwrap/tarball/master"
+ SPAWN_FCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWN_FCGI_VERSION}.tar.gz"
  PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
  PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
- EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
+ # EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
+ EACCELERATOR_URL="https://github.com/eaccelerator/eaccelerator/tarball/master"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.its.cz/MIRRORS/ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
@@ -133,6 +141,7 @@ set_global_conf()
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
  PHPMYADMIN_URL="http://downloads.sourceforge.net/project/phpmyadmin/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
+ AWSTATS_URL="http://prdownloads.sourceforge.net/awstats/awstats-${AWSTATS_VERSION}.tar.gz"
 
  if [[ -z "$MAKEJOBS" ]] || [[ $MAKEJOBS -eq 0 ]]; then
     MAKEJOBS="$(grep -wc MHz /proc/cpuinfo 2>/dev/null)"
@@ -157,6 +166,8 @@ set_global_conf()
  MYSQL_VERSION \
  MONGODB_VERSION \
  NGINX_VERSION \
+ FCGIWRAP_VERSION \
+ SPAWN_FCGI_VERSION \
  PHP_VERSION \
  PHP_MONGO_VERSION \
  EACCELERATOR_VERSION \
@@ -170,7 +181,8 @@ set_global_conf()
  PAM_MYSQL_VERSION \
  PHPMYADMIN_VERSION \
  SUHOSIN_PATCH_VERSION \
- VDA_PATCH_VERSION
+ VDA_PATCH_VERSION \
+ AWSTATS_VERSION
  export \
  MYSQL_URL \
  MONGODB_URL \
@@ -186,7 +198,8 @@ set_global_conf()
  CLAMAV_URL \
  CLAMSMTP_URL \
  PAM_MYSQL_URL \
- PHPMYADMIN_URL
+ PHPMYADMIN_URL \
+ AWSTATS_URL
 }
 
 # generate random string, need it for phpmyadmin
@@ -391,7 +404,7 @@ apply_patch()
     fi
     if [ "$cmd" != "" ]; then
        [ -d ${logdir} ] || mkdir -p ${logdir}
-       msg info "Applying patch file ${patch_file} with strip option -p${strip}."
+       msg info "Applying patch ${patch_file} ($cmd ${patch_file} | patch -p${strip}) ..."
        msg info "Logfile saved in ${logfile}"
        $cmd ${patch_file} | patch -p${strip} >> ${logfile} 2>&1
        if [ $? -ne 0 ]; then
@@ -422,7 +435,7 @@ do_configure()
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
- if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" ]; then
+ if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" -a "${name}" != "fcgiwrap" -a "${name}" != "spawn-fcgi" ]; then
    ./configure \
       --prefix="${PREFIX}/${name}" \
       --sysconfdir="${PREFIX}/${name}/conf" \
@@ -432,6 +445,12 @@ do_configure()
       --target="${TARGET}" \
       --host="${TARGET}" \
       --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+ elif [ "${name}" = "fcgiwrap" -o "${name}" = "spawn-fcgi" ]; then
+   ./configure \
+     --prefix="${PREFIX}/nginx" \
+     --target="${TARGET}" \
+     --host="${TARGET}" \
+     --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "nginx" ]; then
    ./configure \
       --prefix="${PREFIX}/${name}" \
@@ -1160,6 +1179,12 @@ build_nginx()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${NGINX_URL}"
+ local fcginame="gnosek-fcgiwrap-b9f03e6"
+ local fcgitar="fcgiwrap-${FCGIWRAP_VERSION}.tar.gz"
+ local fcgiurl="${FCGIWRAP_URL}"
+ local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
+ local spawntar="${spawnname}.tar.gz"
+ local spawnurl="${SPAWN_FCGI_URL}"
  local wwwlog=/var/log/${name}
  local wwwdir=${DATA}/www
  local uid=$(id -u)
@@ -1173,9 +1198,11 @@ build_nginx()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
+ get_pkg ${fcgiurl} ${fcgitar}
+ get_pkg ${spawnurl} ${spawntar}
+
+ get_dependency ${name}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
@@ -1273,6 +1300,56 @@ build_nginx()
  start_service ${name}
 
  cd $CWD
+
+ # build spawn-fcgi
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${spawnname} ] && rm -fr ${spawnname} || :
+
+ unpack_source ${spawntar}
+ chown_dir ${spawnname}
+ cd ${spawnname} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ do_configure spawn-fcgi
+ run_make spawn-fcgi
+ strip_file ${PREFIX}/${name}/bin/spawn-fcgi
+
+ cd $CWD
+
+ # build fcgiwrap
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${fcginame} ] && rm -fr ${fcginame} || :
+
+ get_dependency fcgiwrap
+
+ unpack_source ${fcgitar}
+ chown_dir ${fcginame}
+ cd ${fcginame} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ [ -x /usr/bin/aclocal ] && /usr/bin/aclocal || { msg error "aclocal failed."; exit 1; }
+ [ -x /usr/bin/autoreconf ] && /usr/bin/autoreconf || { msg error "autoreconf failed."; exit 1; }
+
+ do_configure fcgiwrap
+ stop_service fcgiwrap
+ run_make fcgiwrap
+ strip_file ${PREFIX}/${name}/sbin/fcgiwrap
+
+ if [ ! -e /etc/init.d/fcgiwrap ]; then
+    msg info "Copying start/stop script for fcgiwrap (/etc/init.d/fcgiwrap) ..."
+    cp_as_root $CWD/scripts/fcgiwrap /etc/init.d/fcgiwrap
+    chown_as_root root root /etc/init.d/fcgiwrap
+    chmod_as_root 0755 /etc/init.d/fcgiwrap
+    [ -e /etc/init.d/fcgiwrap ] && \
+    $cmd sed -i \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+      /etc/init.d/fcgiwrap >/dev/null 2>&1
+ fi
+
+ start_service fcgiwrap
+
+ cd $CWD 
 }
 
 # build and install php
@@ -1551,7 +1628,8 @@ build_eaccelerator()
  local name="eaccelerator"
  local version="${EACCELERATOR_VERSION}"
  local tarball="${name}-${version}.tar.bz2"
- local dir="${name}-${version}"
+ # local dir="${name}-${version}"
+ local dir="${name}-${name}-42067ac"
  local url="${EACCELERATOR_URL}"
  local uid=$(id -u)
  local cmd=
@@ -1718,6 +1796,14 @@ build_postfix()
    cd /usr/lib
    ln_as_root ../..${PREFIX}/${name}/sbin/sendmail .
  )
+
+ if [ -e /etc/aliases ]; then
+    msg info "Generating /etc/aliases.db for postfix ..."
+    ${PREFIX}/${name}/sbin/postalias /etc/aliases >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+       msg error "Failed to generate /etc/aliases.db file."
+    fi
+ fi
 
  if [ ! -e /etc/init.d/${name} ]; then
     msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
@@ -1965,10 +2051,10 @@ build_clamav()
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
- mkdir_as_root /var/lib/${name} 0755
+ mkdir_as_root /var/lib/${name} 0750
  chown_as_root clamav root /var/lib/${name}
 
- mkdir_as_root /var/log/${name} 0755
+ mkdir_as_root /var/log/${name} 0750
  chown_as_root clamav root /var/log/${name}
 
  mkdir_as_root ${PREFIX}/${name}/run 0750
@@ -2021,15 +2107,6 @@ build_clamav()
       /etc/init.d/${name}-freshclam >/dev/null 2>&1
  fi
 
- if [ -d /var/lib/${name} ]; then
-    msg info "Updating ${name} anti-virus definitions ..."
-    msg info " * please wait, time may take a while, depending on your internet connetion speed."
-    ${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
-    if [ $? -ne 0 ]; then
-       msg warn "something happened, wasnt able to update anti-virus definitions."
-    fi
- fi
-
  [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
  if [ ! -e /etc/profile.d/${name}.sh ]; then
     msg info "Copying ${name}.sh to /etc/profile.d ... "
@@ -2043,6 +2120,16 @@ build_clamav()
  fi
 
  start_service ${name}-clamd
+
+ if [ -d /var/lib/${name} ]; then
+    msg info "Updating ${name} anti-virus definitions ..."
+    msg info " * please wait, time may take a while, depending on your internet connetion speed."
+    ${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+       msg warn "something happened, wasnt able to update anti-virus definitions."
+    fi
+ fi
+
  start_service ${name}-freshclam
 
  cd $CWD
@@ -2225,12 +2312,10 @@ build_phpmyadmin()
  mkdir_as_root ${PREFIX}/${name}
 
  ( cd ${wwwdir}
-   ln_as_root ../..${PREFIX}/${name} .
+   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name} .
  )
 
  $cmd cp -aRf * ${PREFIX}/${name}
-
- stop_service nginx
 
  if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
   if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
@@ -2282,10 +2367,96 @@ EOF
     chown_as_root root root ${PREFIX}/${name}
  fi
 
- start_service nginx
-
  cd $CWD
 
+}
+
+# build and install awstats
+build_awstats()
+{
+ local name="awstats"
+ local version="${AWSTATS_VERSION}"
+ local tarball="${name}-${version}.tar.gz"
+ local dir="${name}-${version}"
+ local url="${AWSTATS_URL}"
+ local wwwdir=${DATA}/www
+ local wwwdata=${DATA}/${name}
+ local uid=$(id -u)
+ local cmd=
+
+ if [ $uid -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ [ -d build ] || mkdir -p build
+ cd build
+ [ -d ${dir} ] && rm -fr ${dir} || :
+
+ get_dependency ${name}
+
+ get_pkg ${url} ${tarball}
+ unpack_source ${tarball}
+ chown_dir ${dir}
+ cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ mkdir_as_root ${PREFIX}/${name}/conf 0755
+ mkdir_as_root ${PREFIX}/${name}/bin 0755
+ mkdir_as_root ${wwwdir} 0755
+ mkdir_as_root ${wwwdata} 0755
+
+ $cmd cp -aRf wwwroot ${PREFIX}/${name}/
+ $cmd cp -aRf tools ${PREFIX}/${name}/
+ $cmd cp -aRf docs ${PREFIX}/${name}/
+ chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
+ chown_as_root root root ${PREFIX}/${name}
+ cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
+
+ ( cd ${wwwdir}
+   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name}/wwwroot ${name}
+ )
+
+ [ -e ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl ] && \
+ $cmd sed -i \
+    -e "s|/usr/local/etc/awstats|${PREFIX}/${name}/conf|g" \
+    ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl
+
+ if [ ! -x ${PREFIX}/${name}/bin/create-awstats-config.sh ]; then
+    msg info "Copying config generator script for ${name} (create-awstats-config.sh) ..."
+    cp_as_root $CWD/scripts/create-awstats-config.sh ${PREFIX}/${name}/bin/create-awstats-config.sh
+    chown_as_root root root ${PREFIX}/${name}/bin/create-awstats-config.sh
+    chmod_as_root 0755 ${PREFIX}/${name}/bin/create-awstats-config.sh
+    [ -e ${PREFIX}/${name}/bin/create-awstats-config.sh ] && \
+    $cmd sed -i \
+      -e "s|@@DATA@@|${wwwdata}|g" \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      ${PREFIX}/${name}/bin/create-awstats-config.sh
+ fi
+
+ if [ ! -x ${PREFIX}/${name}/bin/update-awstats.sh ]; then
+    msg info "Copying statistics generator script for ${name} (update-awstats.sh) ..."
+    cp_as_root $CWD/scripts/update-awstats.sh ${PREFIX}/${name}/bin/update-awstats.sh
+    chown_as_root root root ${PREFIX}/${name}/bin/update-awstats.sh
+    chmod_as_root 0755 ${PREFIX}/${name}/bin/update-awstats.sh
+    [ -e ${PREFIX}/${name}/bin/update-awstats.sh ] && \
+    $cmd sed -i \
+      -e "s|@@DATA@@|${wwwdata}|g" \
+      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+      ${PREFIX}/${name}/bin/update-awstats.sh
+ fi
+
+ [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+ if [ ! -e /etc/profile.d/${name}.sh ]; then
+    msg info "Copying ${name}.sh to /etc/profile.d ... "
+    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+    chown_as_root root root /etc/profile.d/${name}.sh
+    chmod_as_root 0644 /etc/profile.d/${name}.sh
+    [ -e /etc/profile.d/${name}.sh ] && \
+    $cmd sed -i \
+       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+       /etc/profile.d/${name}.sh >/dev/null 2>&1
+ fi
+
+ cd $CWD
 }
 
 # build and install all available packages

@@ -70,9 +70,9 @@ case "$1" in
                   --user ${DAEMON_USER} --exec ${DAEMON} >/dev/null 2>&1; then
        log_end_msg 0
     else
-        log_end_msg 1
+       log_end_msg 1
     fi
- ;;
+  ;;
   *)
     N=/etc/init.d/$NAME
     echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2

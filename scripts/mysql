@@ -212,7 +212,7 @@ case "${mode}" in
       mysqld_pid=$(cat "${mysqld_pid_file_path}")
       if (kill -0 ${mysqld_pid} 2>/dev/null)
       then
-        log_daemon_msg "Stopping down MySQL server" "$NAME"
+        log_daemon_msg "Stopping MySQL server" "$NAME"
         kill ${mysqld_pid}
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "${mysqld_pid}" "${mysqld_pid_file_path}"; return_value=$?
