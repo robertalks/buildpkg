@@ -525,6 +525,8 @@ run_make()
     cmd="sudo"
  fi
 
+ stop_service ${name}
+
  if [ "${name}" = "postfix" ]; then
     msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
     $cmd sh ./postfix-install -non-interactive \
@@ -957,8 +959,6 @@ build_mysql()
   -DCOMPILATION_COMMENT=MySQL_Community_Server \
   -DMANUFACTURER=$HOST"
 
- stop_service ${name}
-
  run_make ${name}
  strip_dir ${PREFIX}/${name}
  create_user mysql 10101 "MySQL Server" ${dbdir}
@@ -1109,8 +1109,6 @@ build_mongodb()
  chmod_as_root 0644 README
  chmod_as_root 0644 src/mongo/db/security.h
 
- stop_service ${name}
-
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
@@ -1228,8 +1226,6 @@ build_nginx()
   --without-mail_imap_module \
   --without-mail_smtp_module"
 
- stop_service ${name}
-
  run_make ${name}
  strip_dir ${PREFIX}/${name}
  create_user www 10100 "nginx http/https server" ${wwwdir}
@@ -1331,7 +1327,6 @@ build_nginx()
  [ -x /usr/bin/autoreconf ] && /usr/bin/autoreconf || { msg error "autoreconf failed."; exit 1; }
 
  do_configure fcgiwrap
- stop_service fcgiwrap
  run_make fcgiwrap
  strip_file ${PREFIX}/${name}/sbin/fcgiwrap
 
@@ -1522,8 +1517,6 @@ build_monit()
   --program-suffix= \
   --enable-optimized"
 
- stop_service ${name}
-
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
@@ -1605,8 +1598,6 @@ build_php_mongo()
  export LDFLAGS="-L${PREFIX}/mongodb/lib${LIBSUFFIX}"
  do_configure ${name} "--enable-mongo"
 
- stop_service php-fpm
-
  run_make ${name}
  strip_dir ${PREFIX}/php
 
@@ -1617,6 +1608,7 @@ build_php_mongo()
     chown_as_root root root ${PREFIX}/php/conf/conf.d
  fi
 
+ stop_service php-fpm
  start_service php-fpm
 
  cd $CWD
@@ -1655,7 +1647,6 @@ build_eaccelerator()
 
  do_configure ${name} "--enable-eaccelerator"
 
- stop_service php-fpm
  run_make ${name}
  strip_dir ${PREFIX}/php
  rm_as_root ${TMPSRV}/php/eaccelerator/*
@@ -1670,6 +1661,7 @@ build_eaccelerator()
       ${PREFIX}/php/conf/conf.d/eaccelerator.ini >/dev/null 2>&1
  fi
 
+ stop_service php-fpm
  start_service php-fpm
 
  cd $CWD
@@ -1730,8 +1722,6 @@ build_postfix()
      ln -sf lib${i}.a lib${i}.so.1
   done
  cd ..
-
- stop_service ${name}
 
  export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
  run_make ${name}
@@ -1953,8 +1943,6 @@ build_dovecot()
   --with-mem-align=32 \
   --with-zlib"
 
- stop_service ${name}
-
  run_make ${name}
  strip_dir ${PREFIX}/${name}
 
@@ -2166,8 +2154,6 @@ build_clamsmtp()
  apply_patch $CWD/patches/${name}_use_mkstemp.patch.gz 1
 
  do_configure ${name} "--disable-dependency-tracking"
-
- stop_service ${name}
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
