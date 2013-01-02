@@ -525,7 +525,9 @@ run_make()
     cmd="sudo"
  fi
 
- stop_service ${name}
+ if [ "${name}" = "php" ]; then
+    stop_service ${name}-fpm
+ fi
 
  if [ "${name}" = "postfix" ]; then
     msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
@@ -1423,8 +1425,6 @@ build_php()
   --with-mysql=${PREFIX}/mysql \
   --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
   --with-pdo-mysql=${PREFIX}/mysql"
-
- stop_service ${name}-fpm
 
  run_make ${name}
  strip_dir ${PREFIX}/${name}
