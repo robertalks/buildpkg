@@ -3,6 +3,8 @@
 # awstats config generator
 # part of buildpkg script.
 
+set -e
+
 NAME=$(basename $0)
 DOMAIN=$1
 DATA=@@DATA@@

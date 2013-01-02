@@ -3,23 +3,29 @@
 # awstats statistics updater script.
 # part of buildpkg script.
 
+set -e
+
 PREFIX="@@PREFIX@@"
 AWSTATS="${PREFIX}/wwwroot/cgi-bin/awstats.pl"
 DATA="@@DATA@@"
 DOMAIN=$1
+DATE="$(date '+%m%Y')"
+USER=www
 
 msg_error()
 {
  local msg="$1"
  local name="$(basename $0 2>/dev/null)"
- echo "${name}: error: ${msg}"
+ local date="$(date '+%H:%M:%S %d/%m/%Y')"
+ echo "${name}: (${date}): error: ${msg}"
 }
 
 msg_info()
 {
  local msg="$1"
  local name="$(basename $0 2>/dev/null)"
- echo "${name}: info: ${msg}"
+ local date="$(date '+%H:%M:%S %d/%m/%Y')"
+ echo "${name}: (${date}): info: ${msg}"
 }
 
 update_per_domain()
@@ -43,6 +49,14 @@ update_per_domain()
      msg_error "missing awstats domain ${domain} configuration file."
      exit 1
   fi
+
+  if [ "$(stat -c %U ${DATA}/awstats${DATE}.${domain}.txt)" != "${USER}" ]; then
+     chown ${USER} ${DATA}/awstats${DATE}.${domain}.txt >/dev/null 2>&1
+  fi
+  if [ "$(stat -c %U ${DATA}/dnscachelastupdate.${domain}.txt)" != "${USER}" ]; then
+     chown ${USER} ${DATA}/dnscachelastupdate.${domain}.txt >/dev/null 2>&1
+  fi
+
 }
 
 update_all()
