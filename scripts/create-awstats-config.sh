@@ -63,7 +63,12 @@ sed -i \
   -e "s|^SiteDomain=.*|SiteDomain=\"${DOMAIN}\"|" \
   -e "s|^DirData=.*|DirData=\"${DATA}\"|" \
   -e "s|^HostAliases.*|HostAliases=\"localhost 127.0.0.1 REGEX[${REGEX}$]\"|g" \
+  -e "s|^AllowToUpdateStatsFromBrowser=.*|AllowToUpdateStatsFromBrowser=1|g" \
+  -e "s|^AllowFullYearView=.*|AllowFullYearView=3|g" \
+  -e "s|^EnableLockForUpdate=.*|EnableLockForUpdate=1|g" \
   ${NEWCONFIG}
+
+chmod 0644 ${NEWCONFIG} >/dev/null 2>&1
 
 echo "${NAME}: info: ${NEWCONFIG} configuration file generated."
 echo "${NAME}: info: please run update-awstats.sh script to generate the first statistics for domain ${DOMAIN}."

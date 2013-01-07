@@ -50,11 +50,15 @@ update_per_domain()
      exit 1
   fi
 
-  if [ "$(stat -c %U ${DATA}/awstats${DATE}.${domain}.txt)" != "${USER}" ]; then
-     chown ${USER} ${DATA}/awstats${DATE}.${domain}.txt >/dev/null 2>&1
+  if [ -e ${DATA}/awstats${DATE}.${domain}.txt ]; then
+     if [ "$(stat -c %U ${DATA}/awstats${DATE}.${domain}.txt)" != "${USER}" ]; then
+        chown ${USER} ${DATA}/awstats${DATE}.${domain}.txt >/dev/null 2>&1
+     fi
   fi
-  if [ "$(stat -c %U ${DATA}/dnscachelastupdate.${domain}.txt)" != "${USER}" ]; then
-     chown ${USER} ${DATA}/dnscachelastupdate.${domain}.txt >/dev/null 2>&1
+  if [ -e ${DATA}/dnscachelastupdate.${domain}.txt ]; then
+     if [ "$(stat -c %U ${DATA}/dnscachelastupdate.${domain}.txt)" != "${USER}" ]; then
+        chown ${USER} ${DATA}/dnscachelastupdate.${domain}.txt >/dev/null 2>&1
+     fi
   fi
 
 }

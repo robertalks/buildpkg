@@ -2304,6 +2304,7 @@ build_phpmyadmin()
  )
 
  $cmd cp -aRf * ${PREFIX}/${name}
+ rm_as_root ${PREFIX}/${name}/setup
 
  if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
   if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
@@ -2395,6 +2396,8 @@ build_awstats()
  $cmd cp -aRf wwwroot ${PREFIX}/${name}/
  $cmd cp -aRf tools ${PREFIX}/${name}/
  $cmd cp -aRf docs ${PREFIX}/${name}/
+ $cmd find ${PREFIX}/${name} -type f -exec chmod 0644 {} \;
+ $cmd find ${PREFIX}/${name} -type d -exec chmod 0755 {} \;
  chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
  chown_as_root root root ${PREFIX}/${name}
  cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
