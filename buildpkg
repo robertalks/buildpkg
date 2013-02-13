@@ -1,7 +1,7 @@
 #!/bin/bash
 
-NAME=buildpkg
-VERSION=1.0.1
+NAME="$(basename $0)"
+VERSION=1.0.2
 CWD=$(pwd)
 
 # Do not modify this, this are the only supported applications.
@@ -133,7 +133,7 @@ set_global_conf()
  # EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
  EACCELERATOR_URL="https://github.com/eaccelerator/eaccelerator/tarball/master"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
- POSTFIX_URL="ftp://ftp.its.cz/MIRRORS/ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
+ POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
  DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
  SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/release${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
@@ -223,7 +223,7 @@ is_debian()
       exit 1
    fi
  elif [ -s /etc/debian_version ]; then
-   msg warn "Running Debian based distribution, we can continue with the build."
+   msg info "Running Debian (or some derivate), we can continue with the build."
  else
    msg error "We can only build packages on Debian based distribution."
    exit 1
@@ -781,7 +781,7 @@ trigger()
 {
  local name=$1
  if [ $triggeroff -eq 0 ]; then
-  if [ -n ${name} ]; then
+  if [ -n "${name}" ]; then
      sleep 1
      msg info "Triggered (re)build of ${name} ..."
      build_${name} 2>/dev/null || msg error "Failed to (re)build ${name}."
@@ -1181,7 +1181,7 @@ build_nginx()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${NGINX_URL}"
- local fcginame="gnosek-fcgiwrap-b9f03e6"
+ local fcginame="gnosek-fcgiwrap-333ff99"
  local fcgitar="fcgiwrap-${FCGIWRAP_VERSION}.tar.gz"
  local fcgiurl="${FCGIWRAP_URL}"
  local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
@@ -1377,7 +1377,6 @@ build_php()
  get_dependency ${name}
 
  get_pkg ${url} ${tarball}
- # get_patch http://download.suhosin.org suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz
 
  unpack_source ${tarball}
  chown_dir ${dir}
@@ -1386,15 +1385,15 @@ build_php()
 
  do_configure ${name} \
  "--enable-inline-optimization \
-  --enable-sqlite-utf8 \
   --enable-bcmath \
   --enable-calendar \
   --enable-fpm \
+  --enable-sqlite-utf8 \
+  --enable-magic-quotes \
   --with-fpm-user=www \
   --with-fpm-group=www \
   --with-curl \
   --enable-exif \
-  --enable-ftp \
   --with-gd \
   --with-gettext \
   --with-iconv \
@@ -1409,7 +1408,6 @@ build_php()
   --with-zlib \
   --enable-zip \
   --enable-pcntl \
-  --enable-magic-quotes \
   --with-tidy \
   --with-bz2 \
   --enable-shmop \
@@ -1438,7 +1436,7 @@ build_php()
  [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
  if [ ! -e ${PREFIX}/${name}/conf/${name}.ini ]; then
     msg info "Copying new configuration file for ${name} (${name}.ini) ..."
-    cp_as_root $CWD/config.d/${name}.ini ${PREFIX}/${name}/conf/${name}.ini
+    cp_as_root $CWD/config.d/${name}.ini.5.3.x ${PREFIX}/${name}/conf/${name}.ini
     chown_as_root root root ${PREFIX}/${name}/conf
     [ -e ${PREFIX}/${name}/conf/${name}.ini ] && \
     $cmd sed -i \
