@@ -1,7 +1,7 @@
 #!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          fcgiwrap
-# Required-Start:    $remote_fs
+# Required-Start:    $remote_fs nginx
 # Required-Stop:     $remote_fs
 # Should-Start:
 # Should-Stop:
