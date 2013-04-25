@@ -52,12 +52,12 @@ update_per_domain()
 
   if [ -e ${DATA}/awstats${DATE}.${domain}.txt ]; then
      if [ "$(stat -c %U ${DATA}/awstats${DATE}.${domain}.txt)" != "${USER}" ]; then
-        chown ${USER} ${DATA}/awstats${DATE}.${domain}.txt >/dev/null 2>&1
+         chown ${USER} ${DATA}/awstats${DATE}.${domain}.txt >/dev/null 2>&1
      fi
   fi
   if [ -e ${DATA}/dnscachelastupdate.${domain}.txt ]; then
      if [ "$(stat -c %U ${DATA}/dnscachelastupdate.${domain}.txt)" != "${USER}" ]; then
-        chown ${USER} ${DATA}/dnscachelastupdate.${domain}.txt >/dev/null 2>&1
+         chown ${USER} ${DATA}/dnscachelastupdate.${domain}.txt >/dev/null 2>&1
      fi
   fi
 
@@ -71,7 +71,7 @@ update_all()
     exit 0
  else
     for conf in ${files}; do
-	domain="$(grep "^SiteDomain" ${conf} 2>/dev/null | cut -f 2 -d'=' 2>/dev/null | tr -d '"' 2>/dev/null)"
+	domain="$(grep "^SiteDomain" ${conf} 2>/dev/null | cut -f 2 -d\" 2>/dev/null)"
         update_per_domain "${domain}"
     done
  fi

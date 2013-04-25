@@ -32,6 +32,13 @@ fcgiwrapdeps="libfcgi-dev automake autoconf"
 export buildall=0
 export triggeroff=0
 
+if [ -t 1 ]; then
+  COL_RESET="\033[39;49;00m"
+  COL_RED="\033[31;01m"
+  COL_GREEN="\033[32;01m"
+  COL_YELLOW="\033[33;24m"
+fi
+
 # display usage
 usage()
 {
@@ -63,15 +70,16 @@ msg()
 {
  local type=$1
  local message=$2
+
  case "$type" in
    info)
-    echo "${NAME}: info: $message" ;;
+    echo -e "${NAME}: ${COL_GREEN}info${COL_RESET}: $message" ;;
    warn)
-    echo "${NAME}: warn: $message" ;;
+    echo -e "${NAME}: ${COL_YELLOW}warn${COL_RESET}: $message" ;;
    error)
-    echo "${NAME}: error: $message" ;;
+    echo -e "${NAME}: ${COL_RED}error${COL_RESET}: $message" ;;
    *)
-    echo "${NAME}: msg(): missing arguments, usage: \"msg info some_message\"" ;;
+    echo -e "${NAME}: ${COL_RED}msg()${COL_RESET}: missing arguments, usage: \"msg info some_message\"" ;;
  esac
 }
 
@@ -314,9 +322,9 @@ download()
 
  /usr/bin/wget --max-redirect=10 --no-check-certificate --no-cookies -q "${url}" -O "${output}" >/dev/null 2>&1
  if [ $? -eq 0 ]; then
-    echo "OK"
+    echo -e "${COL_GREEN}OK${COL_RESET}"
  else
-    echo "Failed"
+    echo -e "${COL_GREEN}Failed${COL_RESET}"
  fi
 }
 
@@ -332,7 +340,7 @@ get_pkg()
  cd ${srcdir}
 
  if [ ! -e ${src} ]; then
-    echo -n "${NAME}: info: Fetching source archive ${src}: "
+    echo -en "${NAME}: ${COL_GREEN}info${COL_RESET}: Fetching source archive ${src}: "
     download "${url}" "${src}"
  else
     msg warn "Source archive ${src} already exists."
@@ -442,6 +450,8 @@ do_configure()
       --bindir="${PREFIX}/${name}/bin" \
       --sbindir="${PREFIX}/${name}/sbin" \
       --libdir="${PREFIX}/${name}/lib${LIBSUFFIX}" \
+      --program-prefix="" \
+      --program-suffix="" \
       --target="${TARGET}" \
       --host="${TARGET}" \
       --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
@@ -951,7 +961,6 @@ build_mysql()
   -DENABLED_PROFILING=OFF \
   -DWITH_READLINE=ON \
   -DWITH_ZLIB=system \
-  -DWITH_SSL=system \
   -DWITH_LIBWRAP=OFF \
   -DINSTALL_SBINDIR=libexec \
   -DINSTALL_LIBDIR="lib${LIBSUFFIX}" \
@@ -1170,6 +1179,10 @@ build_mongodb()
 
  start_service ${name}
 
+ # restart also php-fpm if available
+ stop_service php-fpm
+ start_service php-fpm
+
  cd $CWD
 }
 
@@ -1181,7 +1194,7 @@ build_nginx()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${NGINX_URL}"
- local fcginame="gnosek-fcgiwrap-333ff99"
+ local fcginame="gnosek-fcgiwrap-1b44aba"
  local fcgitar="fcgiwrap-${FCGIWRAP_VERSION}.tar.gz"
  local fcgiurl="${FCGIWRAP_URL}"
  local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
@@ -2466,7 +2479,7 @@ build_all()
 control_c()
 {
  echo
- msg warn "Ctrl+C was pressed, we are existing ..."
+ msg warn "Ctrl+C was pressed, we are exiting ..."
  sleep 5
  exit $?
 }
