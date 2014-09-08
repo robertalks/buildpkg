@@ -5,7 +5,7 @@ VERSION=1.0.2
 CWD=$(pwd)
 
 # Do not modify this, this are the only supported applications.
-PACKAGES="mysql mongodb nginx php php_mongo eaccelerator postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin awstats monit"
+PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin awstats monit"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev"
 mongodbdeps="scons g++-4.4 xulrunner-dev fontconfig fontconfig-config intltool binutils libpcap-dev libpcre3-dev libboost-dev libreadline-dev python-dev libssl-dev libstdc++6-4.4-dev \
@@ -118,7 +118,6 @@ set_global_conf()
  [ -z "$SPAWN_FCGI_VERSION" ] && { msg error "SPAWN_FCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_MONGO_VERSION" ] && { msg error "PHP_MONGO_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$EACCELERATOR_VERSION" ] && { msg error "EACCELERATOR_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$GREYFIX_VERSION" ] && { msg error "GREYFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -127,7 +126,6 @@ set_global_conf()
  [ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$SUHOSIN_PATCH_VERSION" ] && { msg error "SUHOSIN_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$VDA_PATCH_VERSION" ] && { msg error "VDA_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
@@ -138,8 +136,6 @@ set_global_conf()
  SPAWN_FCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWN_FCGI_VERSION}.tar.gz"
  PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
  PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
- # EACCELERATOR_URL="http://downloads.sourceforge.net/eaccelerator/eaccelerator-${EACCELERATOR_VERSION}.tar.bz2"
- EACCELERATOR_URL="https://github.com/eaccelerator/eaccelerator/tarball/master"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
@@ -178,7 +174,6 @@ set_global_conf()
  SPAWN_FCGI_VERSION \
  PHP_VERSION \
  PHP_MONGO_VERSION \
- EACCELERATOR_VERSION \
  MONIT_VERSION \
  POSTFIX_VERSION \
  GREYFIX_VERSION \
@@ -188,7 +183,6 @@ set_global_conf()
  CLAMSMTP_VERSION \
  PAM_MYSQL_VERSION \
  PHPMYADMIN_VERSION \
- SUHOSIN_PATCH_VERSION \
  VDA_PATCH_VERSION \
  AWSTATS_VERSION
  export \
@@ -197,7 +191,6 @@ set_global_conf()
  NGINX_URL \
  PHP_URL \
  PHP_MONGO_URL \
- EACCELERATOR_URL \
  MONIT_URL \
  POSTFIX_URL \
  GREYFIX_URL \
@@ -1394,7 +1387,6 @@ build_php()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/suhosin-patch-${SUHOSIN_PATCH_VERSION}.patch.gz 1
 
  do_configure ${name} \
  "--enable-inline-optimization \
@@ -1498,7 +1490,6 @@ build_php()
  cd $CWD
 
  if [ ${buildall} -eq 0 ]; then
-    trigger eaccelerator
     trigger php_mongo
  fi
 
@@ -1619,59 +1610,6 @@ build_php_mongo()
     msg info "Copying new configuration file for ${name} (${name}.ini) ..."
     cp_as_root $CWD/config.d/mongo.ini ${PREFIX}/php/conf/conf.d/mongo.ini
     chown_as_root root root ${PREFIX}/php/conf/conf.d
- fi
-
- stop_service php-fpm
- start_service php-fpm
-
- cd $CWD
-}
-
-# build and install eaccelerator
-build_eaccelerator()
-{
- local name="eaccelerator"
- local version="${EACCELERATOR_VERSION}"
- local tarball="${name}-${version}.tar.bz2"
- # local dir="${name}-${version}"
- local dir="${name}-${name}-42067ac"
- local url="${EACCELERATOR_URL}"
- local uid=$(id -u)
- local cmd=
-
- if [ $uid -ne 0 ]; then
-    cmd="sudo"
- fi
-
- # we need to make sure php is already installed.
- need_php ${name}
-
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
-
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
-
- export PATH="${PREFIX}/php/bin:$PATH"
- ${PREFIX}/php/bin/phpize >/dev/null 2>&1 || { msg error "Failed while running ${PREFIX}/php/bin/phpize."; exit 1; }
-
- do_configure ${name} "--enable-eaccelerator"
-
- run_make ${name}
- strip_dir ${PREFIX}/php
- rm_as_root ${TMPSRV}/php/eaccelerator/*
-
- [ -d ${PREFIX}/php/conf/conf.d ] || mkdir_as_root ${PREFIX}/php/conf/conf.d
- if [ ! -e ${PREFIX}/php/conf/conf.d/eaccelerator.ini ]; then
-    msg info "Copying new configuration file for ${name} (${name}.ini) ..."
-    cp_as_root $CWD/config.d/eaccelerator.ini ${PREFIX}/php/conf/conf.d/eaccelerator.ini
-    chown_as_root root root ${PREFIX}/php/conf/conf.d
-    $cmd sed -i \
-      -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-      ${PREFIX}/php/conf/conf.d/eaccelerator.ini >/dev/null 2>&1
  fi
 
  stop_service php-fpm
