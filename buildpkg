@@ -1192,13 +1192,6 @@ build_mongodb()
     [ -d ${PREFIX}/${name}/sbin ] || mkdir_as_root ${PREFIX}/${name}/sbin 0755
     mv_as_root ${PREFIX}/${name}/bin/mongod ${PREFIX}/${name}/sbin/mongod
 
-    if [ "$ARCH" = "x86_64" ]; then
-       rm_as_root ${PREFIX}/${name}/lib
-       ( cd ${PREFIX}/${name}
-         ln_as_root lib${LIBSUFFIX} lib
-       )
-    fi
-
     create_user mongodb 10109 "MondoDB Server" ${dbdir}
 
     [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
