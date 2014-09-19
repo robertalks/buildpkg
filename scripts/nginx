@@ -32,11 +32,15 @@ sanity()
  mkdir -p @@TMPSRV@@/nginx/fastcgi
  mkdir -p @@TMPSRV@@/nginx/client
  mkdir -p @@TMPSRV@@/nginx/proxy
+ mkdir -p @@TMPSRV@@/nginx/scgi
+ mkdir -p @@TMPSRV@@/nginx/uwsgi
  chown ${user}.root -R @@TMPSRV@@/nginx
  chmod 0770 @@TMPSRV@@/nginx
  chmod 0770 @@TMPSRV@@/nginx/fastcgi
  chmod 0770 @@TMPSRV@@/nginx/client
  chmod 0770 @@TMPSRV@@/nginx/proxy
+ chmod 0770 @@TMPSRV@@/nginx/scgi
+ chmod 0770 @@TMPSRV@@/nginx/uwsgi
 }
 
 start_nginx()
