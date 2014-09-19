@@ -522,10 +522,12 @@ run_make()
     msg info "Running $ARCH architecture, without compiler flags."
     msg info "Compiling ${name} source (scons -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name})"
     msg info "Logfile saved in ${logfile}"
+    start_counter="$(date +%s)"
     scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
  else 
     msg info "Compiling ${name} source (make -j${MAKEJOBS})"
     msg info "Logfile saved in ${logfile}"
+    start_counter="$(date +%s)"
     make -j${MAKEJOBS} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
  fi
 }
@@ -574,6 +576,16 @@ run_install()
  else
     msg warn "Install of package from source disabled."
  fi 
+}
+
+elapsed_time()
+{
+ local name=$1
+
+ end_counter="$(date +%s)"
+ diff_timer="$((${end_counter} - ${start_counter}))"
+ timer="$(date -u -d @${diff_timer} +'%-M minutes %-S seconds')"
+ msg info "Build of ${name} took: ${timer}"
 }
 
 # change ownership to running user
@@ -990,6 +1002,7 @@ build_mysql()
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1161,6 +1174,7 @@ build_mongodb()
  chmod_as_root 0644 README
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1286,6 +1300,7 @@ build_nginx()
   --without-mail_smtp_module"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1372,6 +1387,7 @@ build_nginx()
 
  do_configure spawn-fcgi
  run_make spawn-fcgi
+ elapsed_time spawn-fcgi
  run_install spawn-fcgi
  
  if [ ${installoff} -eq 0 ]; then
@@ -1404,6 +1420,7 @@ build_nginx()
 
  do_configure fcgiwrap
  run_make fcgiwrap
+ elapsed_time fcgiwrap
  run_install fcgiwrap
  
  if [ ${installoff} -eq 0 ]; then
@@ -1535,6 +1552,7 @@ build_php()
   --with-pdo-mysql=${PREFIX}/mysql"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1662,6 +1680,7 @@ build_monit()
   --enable-optimized"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1747,6 +1766,7 @@ build_php_mongo()
  do_configure ${name} "--enable-mongo"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1805,6 +1825,7 @@ build_postfix()
  do_configure ${name}
  export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
  run_make ${name}
+ elapsed_time ${name}
 
  if [ ${installoff} -eq 0 ]; then
     if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
@@ -1969,6 +1990,7 @@ build_greyfix()
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2054,6 +2076,7 @@ build_dovecot()
   --with-zlib"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2151,6 +2174,7 @@ build_clamav()
   --program-suffix="
 
  run_make ${name}
+ elapsed_time ${name}
 
  if [ ${installoff} -eq 0 ]; then
     stop_service ${name}-freshclam
@@ -2280,6 +2304,7 @@ build_clamsmtp()
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2352,6 +2377,7 @@ build_pam_mysql()
   --with-pam-mods-dir=${PAM_MODULES_DIR}"
 
  run_make ${name}
+ elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
