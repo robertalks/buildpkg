@@ -28,7 +28,7 @@ clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-p
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
 pam_mysqldeps="libpam0g-dev"
 awstatsdeps="perl perl-modules"
-fcgiwrapdeps="libfcgi-dev automake autoconf"
+fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config"
 
 export buildall=0
 export triggeroff=0
