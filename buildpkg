@@ -512,7 +512,7 @@ run_make()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- SCONS_OPT="--nostrip --disable-warnings-as-errors --full --ssl --release --use-system-pcre --use-system-boost --use-system-tcmalloc --sharedclient"
+ SCONS_OPT="--nostrip --disable-warnings-as-errors --full --ssl --release --use-system-pcre --use-system-boost --sharedclient"
  if [ "$ARCH" = "x86_64" ]; then
    SCONS_OPT="${SCONS_OPT} --64"
  else
