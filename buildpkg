@@ -1127,6 +1127,10 @@ build_mysql()
           msg error "Unable to find mysql_upgrade binary."
        fi
     fi
+
+    for dir in data docs; do
+       rm_as_root ${PREFIX}/${name}/${dir}
+    done
  fi
 
  cd $CWD
