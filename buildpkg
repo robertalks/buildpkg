@@ -7,7 +7,7 @@ CWD=$(pwd)
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin awstats monit"
 
-mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev"
+mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev"
 mongodbdeps="scons g++-4.4 xulrunner-dev fontconfig fontconfig-config intltool binutils libpcap-dev libpcre3-dev libboost-dev libreadline-dev python-dev libssl-dev libstdc++6-4.4-dev \
 libboost-thread-dev libboost-filesystem-dev libboost-program-options-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
