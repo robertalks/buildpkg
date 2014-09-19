@@ -1411,9 +1411,9 @@ build_nginx()
  chown_dir ${fcginame}
  cd ${fcginame} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- [ -x /usr/bin/libtoolize ] || { msg error "libtoolize not found."; exit 1 }
- [ -x /usr/bin/aclocal ] || { msg error "aclocal not found."; exit 1 }
- [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1 }
+ [ -x /usr/bin/libtoolize ] || { msg error "libtoolize not found."; exit 1; }
+ [ -x /usr/bin/aclocal ]    || { msg error "aclocal not found."; exit 1; }
+ [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
 
  msg info "Running /usr/bin/libtoolize ..."
  /usr/bin/libtoolize >/dev/null 2>&1 || msg error "libtoolize failed."
