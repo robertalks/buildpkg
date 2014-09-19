@@ -33,13 +33,11 @@ sanity()
  mkdir -p @@TMPSRV@@/php/log >/dev/null 2>&1
  mkdir -p @@TMPSRV@@/php/sess >/dev/null 2>&1
  mkdir -p @@TMPSRV@@/php/tmp >/dev/null 2>&1
- mkdir -p @@TMPSRV@@/php/eaccelerator >/dev/null 2>&1
  chown ${user}.${user} -R @@TMPSRV@@/php >/dev/null 2>&1
  chmod 0770 @@TMPSRV@@/php >/dev/null 2>&1
  chmod 0770 @@TMPSRV@@/php/log >/dev/null 2>&1
  chmod 0770 @@TMPSRV@@/php/sess >/dev/null 2>&1
  chmod 0770 @@TMPSRV@@/php/tmp >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php/eaccelerator >/dev/null 2>&1
 }
 
 wait_for_pid () {
