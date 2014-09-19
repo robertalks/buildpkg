@@ -9,7 +9,7 @@ PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav c
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev \
 libevent-dev libxml2-dev"
-mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev boost libreadline-dev libssl-dev libstdc++6-4.4-dev"
+mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev libreadline-dev libssl-dev libstdc++6-4.4-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
 phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
