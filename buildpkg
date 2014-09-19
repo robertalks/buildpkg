@@ -1411,16 +1411,9 @@ build_nginx()
  chown_dir ${fcginame}
  cd ${fcginame} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- [ -x /usr/bin/libtoolize ] || { msg error "libtoolize not found."; exit 1; }
- [ -x /usr/bin/aclocal ]    || { msg error "aclocal not found."; exit 1; }
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
-
- msg info "Running /usr/bin/libtoolize ..."
- /usr/bin/libtoolize >/dev/null 2>&1 || true
- msg info "Running /usr/bin/aclocal ..."
- /usr/bin/aclocal >/dev/null 2>&1 || true
- msg info "Running /usr/bin/autoreconf ..."
- /usr/bin/autoreconf -i >/dev/null 2>&1 || true
+ msg info "Running /usr/bin/autoreconf --install ..."
+ /usr/bin/autoreconf --install >/dev/null 2>&1 || msg error "autoreconf failed."
 
  do_configure fcgiwrap
  run_make fcgiwrap
