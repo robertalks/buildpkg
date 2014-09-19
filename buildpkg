@@ -1416,11 +1416,11 @@ build_nginx()
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
 
  msg info "Running /usr/bin/libtoolize ..."
- /usr/bin/libtoolize >/dev/null 2>&1 || msg error "libtoolize failed."
+ /usr/bin/libtoolize >/dev/null 2>&1 || true
  msg info "Running /usr/bin/aclocal ..."
- /usr/bin/aclocal >/dev/null 2>&1 || msg error "aclocal failed."
+ /usr/bin/aclocal >/dev/null 2>&1 || true
  msg info "Running /usr/bin/autoreconf ..."
- /usr/bin/autoreconf -i >/dev/null 2>&1 || msg error "autoreconf failed."
+ /usr/bin/autoreconf -i >/dev/null 2>&1 || true
 
  do_configure fcgiwrap
  run_make fcgiwrap
