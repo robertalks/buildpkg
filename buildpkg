@@ -17,13 +17,13 @@ libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
 libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
 libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
 libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev \
-libkrb5-dev libldap2-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
+libkrb5-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
 libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
 monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev"
-postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev libldap2-dev"
+postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
 greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
-dovecotdeps="build-essential intltool libtool libdb-dev libldap2-dev libsasl2-dev libsqlite3-dev pkg-config \
-libbz2-dev zlib1g-dev libssl-dev libldap2-dev libkrb5-dev"
+dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config \
+libbz2-dev zlib1g-dev libssl-dev libkrb5-dev"
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev \
 libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
@@ -487,7 +487,7 @@ do_configure()
     CCARGS=" \
      -DNO_NIS \
      -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
-     -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE -DHAS_LDAP \
+     -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
      -DHAS_MYSQL -I${PREFIX}/mysql/include \
      -Wno-comments" \
@@ -495,7 +495,6 @@ do_configure()
      -L${PREFIX}/mysql/lib \
      -Wl,-rpath ${PREFIX}/mysql/lib \
      -lpcre \
-     -lldap -llber \
      -lsasl2 -lssl -lcrypto \
      -lmysqlclient -lsqlite3 \
      -lpthread -lz -lm -lrt -ldl -lresolv" \
@@ -2061,7 +2060,6 @@ build_dovecot()
  "--with-shadow \
   --with-pam \
   --with-mysql \
-  --with-ldap \
   --with-ssl=openssl \
   --with-ssldir=${PREFIX}/${name}/ssl \
   --with-rundir=/var/run/${name} \
