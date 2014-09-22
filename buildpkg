@@ -541,6 +541,7 @@ run_make()
     start_counter="$(date +%s)"
     make -j${MAKEJOBS} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
  fi
+ elapsed_time ${name}
 }
 
 # install package from build source
@@ -1013,7 +1014,6 @@ build_mysql()
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1183,7 +1183,6 @@ build_mongodb()
  chmod_as_root 0644 README
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1306,7 +1305,6 @@ build_nginx()
   --without-poll_module"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1393,7 +1391,6 @@ build_nginx()
 
  do_configure spawn-fcgi
  run_make spawn-fcgi
- elapsed_time spawn-fcgi
  run_install spawn-fcgi
  
  if [ ${installoff} -eq 0 ]; then
@@ -1419,7 +1416,6 @@ build_nginx()
 
  do_configure fcgiwrap
  run_make fcgiwrap
- elapsed_time fcgiwrap
  run_install fcgiwrap
  
  if [ ${installoff} -eq 0 ]; then
@@ -1551,7 +1547,6 @@ build_php()
   --with-pdo-mysql=${PREFIX}/mysql"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1679,7 +1674,6 @@ build_monit()
   --enable-optimized"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1765,7 +1759,6 @@ build_php_mongo()
  do_configure ${name} "--enable-mongo"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -1824,7 +1817,6 @@ build_postfix()
  do_configure ${name}
  export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
  run_make ${name}
- elapsed_time ${name}
 
  if [ ${installoff} -eq 0 ]; then
     if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
@@ -1997,7 +1989,6 @@ build_greyfix()
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2086,7 +2077,6 @@ build_dovecot()
   --with-zlib --with-bzlib"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2187,7 +2177,6 @@ build_clamav()
   --program-suffix="
 
  run_make ${name}
- elapsed_time ${name}
 
  if [ ${installoff} -eq 0 ]; then
     stop_service ${name}-freshclam
@@ -2211,7 +2200,7 @@ build_clamav()
     mkdir_as_root $TMPSRV 0777
     chown_as_root root root $TMPSRV
 
-    if [ $(grep -qw ^Example ${PREFIX}/${name}/conf/clamd.conf 2>/dev/null; echo $?) -eq 0 ]; then
+    if [ ! -e ${PREFIX}/${name}/conf/clamd.conf ]; then
        msg info "Copying new configuration file for ${name} (clamd.conf) ..."
        [ -e ${PREFIX}/${name}/conf/clamd.conf ] && rm_as_root ${PREFIX}/${name}/conf/clamd.conf
        cp_as_root $CWD/config.d/clamd.conf ${PREFIX}/${name}/conf
@@ -2222,7 +2211,7 @@ build_clamav()
           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
           ${PREFIX}/${name}/conf/clamd.conf >/dev/null 2>&1
     fi
-    if [ $(grep -qw ^Example ${PREFIX}/${name}/conf/freshclam.conf 2>/dev/null; echo $?) -eq 0 ]; then
+    if [ ! -e ${PREFIX}/${name}/conf/freshclam.conf ]; then
        msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
        [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && rm_as_root ${PREFIX}/${name}/conf/freshclam.conf
        cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
@@ -2267,8 +2256,6 @@ build_clamav()
           /etc/profile.d/${name}.sh >/dev/null 2>&1
     fi
 
-    start_service ${name}-clamd
-
     if [ -d /var/lib/${name} ]; then
        msg info "Updating ${name} anti-virus definitions ..."
        msg info " * please wait, time may take a while, depending on your internet connetion speed."
@@ -2278,6 +2265,7 @@ build_clamav()
        fi
     fi
 
+    start_service ${name}-clamd
     start_service ${name}-freshclam
  fi
 
@@ -2317,7 +2305,6 @@ build_clamsmtp()
  do_configure ${name} "--disable-dependency-tracking"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
@@ -2390,7 +2377,6 @@ build_pam_mysql()
   --with-pam-mods-dir=${PAM_MODULES_DIR}"
 
  run_make ${name}
- elapsed_time ${name}
  run_install ${name}
 
  if [ ${installoff} -eq 0 ]; then
