@@ -23,7 +23,7 @@ monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-de
 postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
 greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
 dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config \
-libbz2-dev zlib1g-dev libssl-dev libkrb5-dev"
+libbz2-dev zlib1g-dev libssl-dev libkrb5-dev libcap-dev"
 spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
 clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev \
 libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
@@ -144,7 +144,7 @@ set_global_conf()
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
- DOVECOT_URL="http://dovecot.org/releases/2.1/dovecot-${DOVECOT_VERSION}.tar.gz"
+ DOVECOT_URL="http://dovecot.org/releases/2.2/dovecot-${DOVECOT_VERSION}.tar.gz"
  SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/release${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
  CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
@@ -375,7 +375,7 @@ get_patch()
 
  url="${url}/${patchname}"
  if [ ! -e ${patchname} ]; then
-    echo -ne "${NAME}: info: Fetching patch file ${patchname}: "
+    echo -ne "${NAME}: ${COL_GREEN}info${COL_RESET}: Fetching patch file ${patchname}: "
     download "${url}" "${patchname}"
  else
     msg warn "Patch file ${patchname} already exists."
@@ -487,13 +487,20 @@ do_configure()
     CCARGS=" \
      -DNO_NIS \
      -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
-     -DUSE_TLS -DUSE_SASL_AUTH -DHAS_SSL -DHAS_MYSQL -DUSE_CYRUS -DHAS_SQLITE \
+     -DDEF_COMMAND_DIR="\\"\"${PREFIX}/${name}/bin\\"\"" \
+     -DDEF_DAEMON_DIR="\\"\"${PREFIX}/${name}/libexec\\"\"" \
+     -DUSE_TLS \
+     -DUSE_SASL_AUTH \
+     -DHAS_SSL \
+     -DHAS_MYSQL \
+     -DUSE_CYRUS \
+     -DHAS_SQLITE \
      -DUSE_CYRUS_SASL -I/usr/include/sasl \
-     -DHAS_MYSQL -I${PREFIX}/mysql/include \
+     -DHAS_MYSQL -I${PREFIX}/mysql/include/mysql \
      -Wno-comments" \
     AUXLIBS=" \
-     -L${PREFIX}/mysql/lib \
-     -Wl,-rpath ${PREFIX}/mysql/lib \
+     -L${PREFIX}/mysql/lib${LIBSUFFIX} \
+     -Wl,-rpath ${PREFIX}/mysql/lib${LIBSUFFIX} \
      -lpcre \
      -lsasl2 -lssl -lcrypto \
      -lmysqlclient -lsqlite3 \
@@ -1012,12 +1019,6 @@ build_mysql()
  if [ ${installoff} -eq 0 ]; then
     strip_dir ${PREFIX}/${name}
     create_user mysql 10101 "MariaDB/MySQL Server" ${dbdir}
-
-    if [ "$ARCH" = "x86_64" ]; then
-       ( cd ${PREFIX}/${name}
-         ln_as_root lib${LIBSUFFIX} lib 
-       )
-    fi
 
     [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
     chown_as_root mysql mysql ${dbdir}
@@ -1953,6 +1954,14 @@ build_postfix()
            /etc/profile.d/${name}.sh >/dev/null 2>&1
     fi
 
+    for dir in doc html man var; do
+       rm_as_root ${PREFIX}/${name}/${dir}
+    done
+
+    for file in main.cf master.cf; do
+       rm_as_root ${PREFIX}/${name}/libexec/${file}
+    done
+
     start_service ${name}
  fi
 
@@ -2057,20 +2066,24 @@ build_dovecot()
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
  do_configure ${name} \
- "--with-shadow \
+ "--libexecdir=${PREFIX}/${name}/lib \
+  --with-moduledir=${PREFIX}/${name}/modules \
+  --disable-static \
   --with-pam \
   --with-mysql \
+  --with-sqlite \
   --with-ssl=openssl \
   --with-ssldir=${PREFIX}/${name}/ssl \
   --with-rundir=/var/run/${name} \
   --with-statedir=/var/lib/${name} \
   --without-docs \
-  --with-sql \
-  --with-gssapi=yes \
-  --with-notify=inotify \
+  --with-sql=plugin \
+  --with-gssapi \
+  --with-solr \
+  --with-libcap \
   --with-ioloop=epoll \
   --with-mem-align=32 \
-  --with-zlib"
+  --with-zlib --with-bzlib"
 
  run_make ${name}
  elapsed_time ${name}
@@ -2124,6 +2137,9 @@ build_dovecot()
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           /etc/profile.d/${name}.sh >/dev/null 2>&1
     fi
+
+    rm_as_root "${PREFIX}/${name}/conf/${name}/conf.d/Makefile*"
+    rm_as_root "${PREFIX}/${name}/share"
 
     start_service ${name}
  fi
