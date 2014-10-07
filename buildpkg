@@ -1575,11 +1575,15 @@ build_php()
     if [ ! -e ${PREFIX}/${name}/conf/modules.d/opcache.ini ]; then
        msg info "Copying new configuration file for ${name} (opcache.ini) ..."
        cp_as_root $CWD/config.d/opcache.ini ${PREFIX}/${name}/conf/modules.d/opcache.ini
+       [ -e ${PREFIX}/${name}/conf/modules.d/opcache.ini ] && \
+       $cmd sed -i \
+           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+           ${PREFIX}/${name}/conf/modules.d/opcache.ini >/dev/null 2>&1
     fi
 
-    if [ ! -e ${PREFIX}/${name}/conf/modules.d/${name}-modules.ini ]; then
+    if [ ! -e ${PREFIX}/${name}/conf/modules.d/modules.ini ]; then
        msg info "Copying new configuration file for ${name} (${name}-modules.ini) ..."
-       cp_as_root $CWD/config.d/${name}-modules.ini ${PREFIX}/${name}/conf/modules.d/${name}-modules.ini
+       cp_as_root $CWD/config.d/${name}-modules.ini ${PREFIX}/${name}/conf/modules.d/modules.ini
     fi
 
     if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then

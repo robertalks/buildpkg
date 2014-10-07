@@ -296,13 +296,13 @@ serialize_precision = 17
 ; or per-virtualhost web server configuration file. This directive is
 ; *NOT* affected by whether Safe Mode is turned On or Off.
 ; http://php.net/open-basedir
-open_basedir = "@@DATA@@"
+open_basedir = "@@DATA@@:@@TMPSRV@@/php/tmp"
 
 ; This directive allows you to disable certain functions for security reasons.
 ; It receives a comma-delimited list of function names. This directive is
 ; *NOT* affected by whether Safe Mode is turned On or Off.
 ; http://php.net/disable-functions
-disable_functions = phpinfo,system,dl
+disable_functions = dl,exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec
 
 ; This directive allows you to disable certain classes for security reasons.
 ; It receives a comma-delimited list of class names. This directive is
@@ -576,7 +576,7 @@ html_errors = On
 ; Log errors to syslog (Event Log on Windows).
 ;error_log = syslog
 
-error_log = @@TMPSRV@@/php/log/php_error.log
+error_log = @@TMPSRV@@/php/log/php.log
 
 ;windows.show_crt_warning
 ; Default value: 0
