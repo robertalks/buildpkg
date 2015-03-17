@@ -8,18 +8,18 @@ CWD=$(pwd)
 PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql phpmyadmin awstats monit"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev \
-libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev"
+libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
 mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
 libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev libstdc++6-4.4-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
-phpdeps="build-essential libtool libltdl7 libmhash-dev libxml2-dev \
+phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
 libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
 libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
 libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev \
 libkrb5-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev \
 libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
-monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev"
+monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev automake autoconf libtool"
 postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
 greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
 dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config \
@@ -30,7 +30,7 @@ libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev l
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
 pam_mysqldeps="libpam0g-dev"
 awstatsdeps="perl perl-modules"
-fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config"
+fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
 
 export buildall=0
 export triggeroff=0
@@ -412,6 +412,7 @@ apply_patch()
        [ -d ${logdir} ] || mkdir -p ${logdir}
        msg info "Applying patch ${patch_file} ..."
        msg info "Logfile saved in ${logfile}"
+       echo "applying patch ${patch_file} ..." >> ${logfile}
        $cmd ${patch_file} | patch -p${strip} >> ${logfile} 2>&1
        if [ $? -ne 0 ]; then
           msg error "unable to apply patch ${patch_file}."
@@ -479,7 +480,6 @@ do_configure()
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}/${name}" \
     -DINSTALL_SYSCONFDIR="${PREFIX}/${name}/conf" \
-    -DBUILD_CONFIG=mysql_release \
     ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "postfix" ]; then
    make makefiles \
@@ -965,8 +965,10 @@ build_mysql()
  local mylogdir="${MYDB}/log/${name}"
  local logdir=$CWD/log
  local db_install_log=${logdir}/${name}-db-install.log
+ local db_upgrade_log=${logdir}/${name}-db-upgrade.log
  local dbdir="${MYDB}/${name}"
  local db_install=0
+ local date=$(date "+%Y%m%d")
  local uid="$(id -u 2>/dev/null)"
  local cmd=
 
@@ -985,6 +987,11 @@ build_mysql()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
+ apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
+ apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
+
+ _cflags="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
+ _cxxflags="${_cflags} -felide-constructors -fno-rtti"
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -995,23 +1002,27 @@ build_mysql()
   -DWITH_ARCHIVE_STORAGE_ENGINE=1 \
   -DWITH_BLACKHOLE_STORAGE_ENGINE=1 \
   -DWITH_PARTITION_STORAGE_ENGINE=1 \
-  -DWITH_TOKUDB_STORAGE_ENGINE=1 \
-  -DMYSQL_MAINTAINER_MODE=1 \
   -DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
   -DWITHOUT_FEDERATED_STORAGE_ENGINE=1 \
+  -DWITHOUT_TOKUDB_STORAGE_ENGINE=1 \
   -DWITH_UNIT_TESTS=OFF \
   -DENABLED_PROFILING=OFF \
-  -DWITH_READLINE=ON \
   -DWITH_ZLIB=system \
   -DWITH_SSL=system \
-  -DWITH_LIBWRAP=OFF \
-  -DWITH_JEMALLOC=OFF \
   -DINSTALL_SBINDIR=libexec \
-  -DINSTALL_LIBDIR="lib${LIBSUFFIX}" \
-  -DINSTALL_PLUGINDIR="lib${LIBSUFFIX}/mysql/plugin" \
-  -DINSTALL_MYSQLDATADIR=${dbdir} \
-  -DMYSQL_DATADIR=${dbdir} \
-  -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock"
+  -DINSTALL_PLUGINDIR=lib/mysql/plugin \
+  -DCMAKE_C_FLAGS_RELWITHDEBINFO="${_cflags}" \
+  -DCMAKE_C_FLAGS_RELEASE="${_cflags}" \
+  -DCMAKE_C_FLAGS="${_cflags}" \
+  -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="${_cxxflags}" \
+  -DCMAKE_CXX_FLAGS_RELEASE="${_cxxflags}" \
+  -DCMAKE_CXX_FLAGS="${_cxxflags}" \
+  -DCMAKE_EXE_LINKER_FLAGS="-Wl,--as-needed -pie -Wl,-z,relro,-z,now" \
+  -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--as-needed -pie -Wl,-z,relro,-z,now" \
+  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--as-needed -pie -Wl,-z,relro,-z,now" \
+  -DMYSQL_DATADIR="${dbdir}" \
+  -DMYSQL_UNIX_ADDR="${TMPSRV}/mysql.sock" \
+  -DINSTALL_UNIX_ADDRDIR="${TMPSRV}/mysql.sock""
 
  run_make ${name}
  run_install ${name}
@@ -1029,7 +1040,7 @@ build_mysql()
       ln_as_root ../..${PREFIX}/${name}/bin/mysql_config .
     )
 
-    ld_add "${PREFIX}/${name}/lib${LIBSUFFIX}" ${name}
+    ld_add "${PREFIX}/${name}/lib" ${name}
     ldconfig
 
     mkdir_as_root $TMPSRV 0777
@@ -1050,7 +1061,11 @@ build_mysql()
        -e "/my.cnf/ s|${PREFIX}/${name}|${PREFIX}/${name}/conf|g" \
        ${PREFIX}/${name}/bin/mysqlaccess
 
-    if [ ! -e ${PREFIX}/${name}/conf/my.cnf ]; then
+    if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
+       if [ -e ${PREFIX}/${name}/conf/my.cnf ]; then
+          msg info "Backing up my.cnf configuration file to my.cnf.${date} ..."
+          cp_as_root ${PREFIX}/${name}/conf/my.cnf ${PREFIX}/${name}/conf/my.cnf.${date}
+       fi
        msg info "Copying new configuration file for ${name} (my.cnf) ..."
        cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
        chown_as_root root root ${PREFIX}/${name}/conf
@@ -1060,7 +1075,9 @@ build_mysql()
           -e "s|@@MYDB@@|${MYDB}|g" \
           -e "s|@@MYLOG@@|${MYDB}|g" \
           ${PREFIX}/${name}/conf/my.cnf >/dev/null 2>&1
+       $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
     fi
+
     if [ ! -e /etc/init.d/${name} ]; then
        msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
        cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
@@ -1080,9 +1097,10 @@ build_mysql()
        msg info "Installing MySQL database in ${dbdir} ..."
        msg info "Logfile saved in ${db_install_log}"
        $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
+          --defaults-file=${PREFIX}/${name}/conf/my.cnf \
           --basedir=${PREFIX}/${name} \
           --datadir=${dbdir} \
-         --user=mysql > ${db_install_log} 2>&1
+          --user=mysql > ${db_install_log} 2>&1
     else
       db_install=0
       msg info "MySQL database found, we wont do nothing."
@@ -1124,9 +1142,11 @@ build_mysql()
 
     if [ ${db_install} -eq 0 ]; then
        if [ -x ${PREFIX}/${name}/bin/mysql_upgrade ]; then
+          [ -e ${db_upgrade_log} ] && rm -f ${db_upgrade_log}
           msg info "Running mysql_upgrade (if version didnt change, this wont do anything)"
-          ${PREFIX}/${name}/bin/mysql_upgrade \
-             -u root -p${MYSQL_ROOT_PASSWORD} -h localhost >/dev/null 2>&1 || \
+          msg info "Logfile saved in ${db_upgrade_log}"
+          ${PREFIX}/${name}/bin/mysql_upgrade --force \
+             -u root -p${MYSQL_ROOT_PASSWORD} -h localhost > ${db_upgrade_log} 2>&1 || \
              msg warn "Failed to upgrade database or database is up to date."
        else
           msg error "Unable to find mysql_upgrade binary."
@@ -1411,8 +1431,8 @@ build_nginx()
  cd ${fcginame} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
- msg info "Running /usr/bin/autoreconf --install ..."
- /usr/bin/autoreconf --install >/dev/null 2>&1 || msg error "autoreconf failed."
+ msg info "Running /usr/bin/autoreconf --install --force ..."
+ /usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
 
  do_configure fcgiwrap
  run_make fcgiwrap
@@ -1671,6 +1691,11 @@ build_monit()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
+ # apply_patch $CWD/patches/monit_fix_missing.patch.gz 1
+
+ [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
+ msg info "Running /usr/bin/autoreconf --install --force ..."
+ /usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
 
  do_configure ${name} \
  "--program-prefix= \
@@ -1719,6 +1744,8 @@ build_monit()
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           /etc/profile.d/${name}.sh >/dev/null 2>&1
     fi
+    
+    rm_as_root ${PREFIX}/${name}/share
 
     start_service ${name}
  fi
