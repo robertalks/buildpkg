@@ -2795,7 +2795,7 @@ check_all()
  for name in ${PACKAGES}; do
     if $(is_pkg_installed $name); then
        version="$(get_pkg_version $name)"
-       if [ "$version" == "0" ]; then
+       if [ "$version" != "0" ]; then
           msg info "$name: $version" 
        fi
     else
