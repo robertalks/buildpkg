@@ -2786,18 +2786,22 @@ build_awstats()
 # check what packages are installed and what version they are running
 check_all()
 {
+ local version
+ 
  # check if is debian/ubuntu, if not exit,
  # we can't handle other type of distro's, yet.
  is_debian
 
  for name in ${PACKAGES}; do
     if $(is_pkg_installed $name); then
-       ver="$(get_pkg_version $name)"
-       if [ "$ver" == "0" ]; then
-          msg warn "$name is not installed"
+       version="$(get_pkg_version $name)"
+       if [ "$version" == "0" ]; then
+          msg warn "$name: not installed"
        else
-          msg info "$name installed, running version $ver"
+          msg info "$name: $version" 
        fi
+    else
+       msg warn "$name: not installed"
     fi
  done
 }
