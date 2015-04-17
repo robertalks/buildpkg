@@ -1481,10 +1481,6 @@ build_nginx()
  
  if [ ${installoff} -eq 0 ]; then
     strip_file ${PREFIX}/${name}/bin/spawn-fcgi
-    if ! $(update_pkg_version "spawn-fcgi" "$SPAWN_FCGI_VERSION"); then
-        msg error "Failed to update spawn-fcgi version file."
-        exit 1
-    fi
  fi
 
  cd $CWD
@@ -1528,11 +1524,6 @@ build_nginx()
     for dir in html man share; do
        rm_as_root "${PREFIX}/${name}/${dir}"
     done
-
-    if ! $(update_pkg_version "fcgiwrap" "$FCGIWRAP_VERSION"); then
-        msg error "Failed to update fcgiwrap version file."
-        exit 1
-    fi
  fi
 
  cd $CWD 
