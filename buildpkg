@@ -2798,8 +2798,6 @@ check_all()
        if [ "$version" != "0" ]; then
           msg info "$name: $version" 
        fi
-    else
-       msg info "$name: not installed"
     fi
  done
 }
