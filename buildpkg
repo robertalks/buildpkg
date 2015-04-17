@@ -288,6 +288,55 @@ get_dependency()
  sleep 1
 }
 
+# get package version
+get_pkg_version()
+{
+ local name="$1"
+ local version="0"
+
+ if [ -r "$PREFIX/$name/.$name-version" ]; then
+    version="$(cat $PREFIX/$name/.$name-version 2>/dev/null || echo 0)"
+ fi
+
+ echo $version
+}
+
+# update version
+update_pkg_version()
+{
+ local name="$1"
+ local version="$2"
+
+ [ -z $name ] && return 1
+ [ -z $version ] && return 1
+
+ if [ -d "$PREFIX/$name" ]; then
+    echo "$version" > "$PREFIX/$name/.$name-version" 2>/dev/null
+    if [ $? -eq 0 ]; then
+       return 0
+    fi
+ fi
+
+ return 1
+}
+
+# check if package is installed
+is_pkg_installed()
+{
+ local name="$1"
+
+ [ -z $name ] && return 1
+
+ if [ -d "$PREFIX/$name" ]; then
+    if [ -r "$PREFIX/$name/.$name-version" ]; then
+       return 0
+    fi
+    return 2
+ fi
+
+ return 1
+}
+
 # set build CFLAGS/CXXFLAGS flags
 set_cflags()
 {
@@ -1159,6 +1208,11 @@ build_mysql()
     for dir in data docs; do
        rm_as_root ${PREFIX}/${name}/${dir}
     done
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -1257,6 +1311,11 @@ build_mongodb()
     fi
 
     start_service ${name}
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
 
     # restart also php-fpm if available
     stop_service php-fpm
@@ -1399,6 +1458,10 @@ build_nginx()
 
     start_service ${name}
 
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -1418,6 +1481,10 @@ build_nginx()
  
  if [ ${installoff} -eq 0 ]; then
     strip_file ${PREFIX}/${name}/bin/spawn-fcgi
+    if ! $(update_pkg_version "spawn-fcgi" "$SPAWN_FCGI_VERSION"); then
+        msg error "Failed to update spawn-fcgi version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -1461,6 +1528,11 @@ build_nginx()
     for dir in html man share; do
        rm_as_root "${PREFIX}/${name}/${dir}"
     done
+
+    if ! $(update_pkg_version "fcgiwrap" "$FCGIWRAP_VERSION"); then
+        msg error "Failed to update fcgiwrap version file."
+        exit 1
+    fi
  fi
 
  cd $CWD 
@@ -1665,6 +1737,11 @@ build_php()
     done
 
     start_service ${name}-fpm
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -1751,6 +1828,11 @@ build_monit()
     rm_as_root ${PREFIX}/${name}/share
 
     start_service ${name}
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -1989,6 +2071,11 @@ build_postfix()
     done
 
     start_service ${name}
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -2055,6 +2142,11 @@ build_greyfix()
        $cmd sed -i \
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           /etc/profile.d/${name}.sh >/dev/null 2>&1
+    fi
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
     fi
  fi
 
@@ -2166,6 +2258,11 @@ build_dovecot()
     rm_as_root "${PREFIX}/${name}/share"
 
     start_service ${name}
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -2301,6 +2398,11 @@ build_clamav()
 
     start_service ${name}-clamd
     start_service ${name}-freshclam
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -2371,6 +2473,11 @@ build_clamsmtp()
     fi
 
     start_service ${name}
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -2493,37 +2600,38 @@ build_phpmyadmin()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- mkdir_as_root ${wwwdir}
- mkdir_as_root ${PREFIX}/${name}
+ if [ ${installoff} -eq 0 ]; then
+    mkdir_as_root ${wwwdir}
+    mkdir_as_root ${PREFIX}/${name}
 
- ( cd ${wwwdir}
-   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name} .
- )
+    ( cd ${wwwdir}
+      [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name} .
+    )
 
- $cmd cp -aRf * ${PREFIX}/${name}
- for file in ChangeLog CONTRIBUTING.md DCO LICENSE README \
+    $cmd cp -aRf * ${PREFIX}/${name}
+    for file in ChangeLog CONTRIBUTING.md DCO LICENSE README \
                RELEASE-DATE-4.2.8 examples setup; do
-     rm_as_root ${PREFIX}/${name}/${file}
- done
+        rm_as_root ${PREFIX}/${name}/${file}
+    done
 
- if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
-  if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
-     mkdir_as_root ${PREFIX}/nginx/conf/sites.d
-     msg info "Copying new configuration file for nginx (${name}.conf) ..."
-     cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
-     [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
-     $cmd sed -i \
-       -e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
-       -e "s|@@DATA@@|${DATA}/www/${name}|g" \
-       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-       ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
-     chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
-  fi
- fi
+    if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
+       if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
+          mkdir_as_root ${PREFIX}/nginx/conf/sites.d
+          msg info "Copying new configuration file for nginx (${name}.conf) ..."
+          cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
+          [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
+          $cmd sed -i \
+             -e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
+             -e "s|@@DATA@@|${DATA}/www/${name}|g" \
+             -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+             ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
+          chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
+       fi
+    fi
 
- if [ ! -e ${PREFIX}/${name}/config.inc.php ]; then
-    msg info "Generating a default configuration for ${name} (${PREFIX}/${name}/config.inc.php) ..."
-    $cmd cat << EOF > ${PREFIX}/${name}/config.inc.php
+    if [ ! -e ${PREFIX}/${name}/config.inc.php ]; then
+       msg info "Generating a default configuration for ${name} (${PREFIX}/${name}/config.inc.php) ..."
+       $cmd cat << EOF > ${PREFIX}/${name}/config.inc.php
 <?php
 /* Generated by buildpkg */
 
@@ -2553,7 +2661,13 @@ build_phpmyadmin()
 
 ?>
 EOF
-    chown_as_root root root ${PREFIX}/${name}
+       chown_as_root root root ${PREFIX}/${name}
+    fi
+
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
@@ -2592,83 +2706,109 @@ build_awstats()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- mkdir_as_root ${PREFIX}/${name}/conf 0755
- mkdir_as_root ${PREFIX}/${name}/bin 0755
- mkdir_as_root ${wwwdir} 0755
- mkdir_as_root ${wwwdata} 0755
+ if [ ${installoff} -eq 0 ]; then
+    mkdir_as_root ${PREFIX}/${name}/conf 0755
+    mkdir_as_root ${PREFIX}/${name}/bin 0755
+    mkdir_as_root ${wwwdir} 0755
+    mkdir_as_root ${wwwdata} 0755
 
- $cmd cp -aRf wwwroot ${PREFIX}/${name}/
- $cmd cp -aRf tools ${PREFIX}/${name}/
- $cmd cp -aRf docs ${PREFIX}/${name}/
- $cmd find ${PREFIX}/${name} -type f -exec chmod 0644 {} \;
- $cmd find ${PREFIX}/${name} -type d -exec chmod 0755 {} \;
- chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
- chown_as_root root root ${PREFIX}/${name}
- chown_as_root www root ${wwwdata}
- cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
+    $cmd cp -aRf wwwroot ${PREFIX}/${name}/
+    $cmd cp -aRf tools ${PREFIX}/${name}/
+    $cmd cp -aRf docs ${PREFIX}/${name}/
+    $cmd find ${PREFIX}/${name} -type f -exec chmod 0644 {} \;
+    $cmd find ${PREFIX}/${name} -type d -exec chmod 0755 {} \;
+    chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
+    chown_as_root root root ${PREFIX}/${name}
+    chown_as_root www root ${wwwdata}
+    cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
 
- ( cd ${wwwdir}
-   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name}/wwwroot ${name}
- )
+    ( cd ${wwwdir}
+      [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name}/wwwroot ${name}
+    )
 
- rm_as_root ${PREFIX}/${name}/wwwroot/cgi-bin/awstats.model.conf
+    rm_as_root ${PREFIX}/${name}/wwwroot/cgi-bin/awstats.model.conf
 
- [ -e ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl ] && \
- $cmd sed -i \
-    -e "s|/usr/local/etc/awstats|${PREFIX}/${name}/conf|g" \
-    ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl
-
- if [ ! -x ${PREFIX}/${name}/bin/create-awstats-config.sh ]; then
-    msg info "Copying config generator script for ${name} (create-awstats-config.sh) ..."
-    cp_as_root $CWD/scripts/create-awstats-config.sh ${PREFIX}/${name}/bin/create-awstats-config.sh
-    chown_as_root root root ${PREFIX}/${name}/bin/create-awstats-config.sh
-    chmod_as_root 0755 ${PREFIX}/${name}/bin/create-awstats-config.sh
-    [ -e ${PREFIX}/${name}/bin/create-awstats-config.sh ] && \
+    [ -e ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl ] && \
     $cmd sed -i \
-      -e "s|@@DATA@@|${wwwdata}|g" \
-      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-      ${PREFIX}/${name}/bin/create-awstats-config.sh
- fi
+        -e "s|/usr/local/etc/awstats|${PREFIX}/${name}/conf|g" \
+        ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl
 
- if [ ! -x ${PREFIX}/${name}/bin/update-awstats.sh ]; then
-    msg info "Copying statistics generator script for ${name} (update-awstats.sh) ..."
-    cp_as_root $CWD/scripts/update-awstats.sh ${PREFIX}/${name}/bin/update-awstats.sh
-    chown_as_root root root ${PREFIX}/${name}/bin/update-awstats.sh
-    chmod_as_root 0755 ${PREFIX}/${name}/bin/update-awstats.sh
-    [ -e ${PREFIX}/${name}/bin/update-awstats.sh ] && \
-    $cmd sed -i \
-      -e "s|@@DATA@@|${wwwdata}|g" \
-      -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-      ${PREFIX}/${name}/bin/update-awstats.sh
- fi
+    if [ ! -x ${PREFIX}/${name}/bin/create-awstats-config.sh ]; then
+       msg info "Copying config generator script for ${name} (create-awstats-config.sh) ..."
+       cp_as_root $CWD/scripts/create-awstats-config.sh ${PREFIX}/${name}/bin/create-awstats-config.sh
+       chown_as_root root root ${PREFIX}/${name}/bin/create-awstats-config.sh
+       chmod_as_root 0755 ${PREFIX}/${name}/bin/create-awstats-config.sh
+       [ -e ${PREFIX}/${name}/bin/create-awstats-config.sh ] && \
+       $cmd sed -i \
+          -e "s|@@DATA@@|${wwwdata}|g" \
+          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+          ${PREFIX}/${name}/bin/create-awstats-config.sh
+    fi
 
- if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
-  if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
-     mkdir_as_root ${PREFIX}/nginx/conf/sites.d
-     msg info "Copying new configuration file for nginx (${name}.conf) ..."
-     cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
-     [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
-     $cmd sed -i \
-       -e "s|@@DATA@@|${DATA}/www/${name}|g" \
-       -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-       ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
-     chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
-  fi
- fi
+    if [ ! -x ${PREFIX}/${name}/bin/update-awstats.sh ]; then
+       msg info "Copying statistics generator script for ${name} (update-awstats.sh) ..."
+       cp_as_root $CWD/scripts/update-awstats.sh ${PREFIX}/${name}/bin/update-awstats.sh
+       chown_as_root root root ${PREFIX}/${name}/bin/update-awstats.sh
+       chmod_as_root 0755 ${PREFIX}/${name}/bin/update-awstats.sh
+       [ -e ${PREFIX}/${name}/bin/update-awstats.sh ] && \
+       $cmd sed -i \
+          -e "s|@@DATA@@|${wwwdata}|g" \
+          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+          ${PREFIX}/${name}/bin/update-awstats.sh
+    fi
 
- [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
- if [ ! -e /etc/profile.d/${name}.sh ]; then
-    msg info "Copying ${name}.sh to /etc/profile.d ... "
-    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-    chown_as_root root root /etc/profile.d/${name}.sh
-    chmod_as_root 0644 /etc/profile.d/${name}.sh
-    [ -e /etc/profile.d/${name}.sh ] && \
-    $cmd sed -i \
-       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-       /etc/profile.d/${name}.sh >/dev/null 2>&1
+    if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
+       if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
+          mkdir_as_root ${PREFIX}/nginx/conf/sites.d
+          msg info "Copying new configuration file for nginx (${name}.conf) ..."
+          cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
+          [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
+          $cmd sed -i \
+             -e "s|@@DATA@@|${DATA}/www/${name}|g" \
+             -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+             ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
+           chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
+       fi
+    fi
+
+    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+    if [ ! -e /etc/profile.d/${name}.sh ]; then
+       msg info "Copying ${name}.sh to /etc/profile.d ... "
+       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+       chown_as_root root root /etc/profile.d/${name}.sh
+       chmod_as_root 0644 /etc/profile.d/${name}.sh
+       [ -e /etc/profile.d/${name}.sh ] && \
+       $cmd sed -i \
+           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+           /etc/profile.d/${name}.sh >/dev/null 2>&1
+    fi
+
+    if ! $(update_pkg_version "$name" "$version"); then
+       msg error "Failed to update $name version file."
+       exit 1
+    fi
  fi
 
  cd $CWD
+}
+
+# check what packages are installed and what version they are running
+check_all()
+{
+ # check if is debian/ubuntu, if not exit,
+ # we can't handle other type of distro's, yet.
+ is_debian
+
+ for name in ${PACKAGES}; do
+    if $(is_pkg_installed $name); then
+       ver="$(get_pkg_version $name)"
+       if [ "$ver" == "0" ]; then
+          msg warn "$name is not installed"
+       else
+          msg info "$name installed, running version $ver"
+       fi
+    fi
+ done
 }
 
 # build and install all available packages
@@ -2719,8 +2859,8 @@ trap control_c SIGINT
 while [ $# -gt 0 ]; do
  case "$1" in
   --help)
-    usage
-    exit 0
+     usage
+     exit 0
   ;;
 
   --dont-trigger)
@@ -2728,7 +2868,12 @@ while [ $# -gt 0 ]; do
   ;;
 
   --dont-install)
-    export installoff=1
+     export installoff=1
+  ;;
+
+  --check-all)
+     check_all
+     exit 0
   ;;
 
   --pkg=*)
@@ -2747,12 +2892,14 @@ while [ $# -gt 0 ]; do
      msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
      read
      build_all
+     exit 0
   ;;
 
   *)
-    usage
-    msg error "missing or wrong arguments."
-    ;;
+     usage
+     msg error "missing or wrong arguments."
+  ;;
+
  esac
  shift
 done
