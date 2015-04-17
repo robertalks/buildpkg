@@ -2787,10 +2787,6 @@ build_awstats()
 check_all()
 {
  local version
- 
- # check if is debian/ubuntu, if not exit,
- # we can't handle other type of distro's, yet.
- is_debian
 
  for name in ${PACKAGES}; do
     if $(is_pkg_installed $name); then
