@@ -2796,12 +2796,10 @@ check_all()
     if $(is_pkg_installed $name); then
        version="$(get_pkg_version $name)"
        if [ "$version" == "0" ]; then
-          msg info "$name: not installed"
-       else
           msg info "$name: $version" 
        fi
     else
-       msg warn "$name: not installed"
+       msg info "$name: not installed"
     fi
  done
 }
