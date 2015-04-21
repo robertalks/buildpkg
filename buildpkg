@@ -500,8 +500,8 @@ do_configure()
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
  msg info "Running $ARCH architecture, using compiler flags:"
- msg info " * CFLAGS: $CFLAGS"
- msg info " * CXXFLAGS: $CXXFLAGS"
+ msg info " -- CFLAGS: $CFLAGS"
+ msg info " -- CXXFLAGS: $CXXFLAGS"
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
@@ -2390,7 +2390,7 @@ build_clamav()
 
     if [ -d /var/lib/${name} ]; then
        msg info "Updating ${name} anti-virus definitions ..."
-       msg info " * please wait, time may take a while, depending on your internet connetion speed."
+       msg info " -- please wait, time may take a while, depending on your internet connetion speed."
        ${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
        if [ $? -ne 0 ]; then
           msg warn "something happened, wasnt able to update anti-virus definitions."
@@ -2828,7 +2828,7 @@ build_all()
 
  export buildall=1
  for name in ${PACKAGES}; do
-    msg info "*** Building now package: ${name}"
+    msg info "--- Building now package: ${name}"
     build_${name}
  done
 }
@@ -2871,17 +2871,17 @@ while [ $# -gt 0 ]; do
      exit 0
   ;;
 
+  --check-all)
+     check_all
+     exit 0
+  ;;
+
   --dont-trigger)
      export triggeroff=1
   ;;
 
   --dont-install)
      export installoff=1
-  ;;
-
-  --check-all)
-     check_all
-     exit 0
   ;;
 
   --pkg=*)
@@ -2928,7 +2928,7 @@ if [ $buildpkg -eq 1 ]; then
          # we can't handle other type of distro's, yet.
          is_debian
 
-         msg info "*** Building now package: ${name}"
+         msg info "--- Building now package: ${name}"
          build_${name}
       fi
    fi
