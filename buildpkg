@@ -2828,7 +2828,7 @@ build_all()
 
  export buildall=1
  for name in ${PACKAGES}; do
-    msg info "--- Building now package: ${name}"
+    msg info "--- Building now package: ${COL_RED}${name}${COL_RESET}"
     build_${name}
  done
 }
@@ -2928,7 +2928,7 @@ if [ $buildpkg -eq 1 ]; then
          # we can't handle other type of distro's, yet.
          is_debian
 
-         msg info "--- Building now package: ${name}"
+         msg info "--- Building now package: ${COL_RED}${name}${COL_RESET}"
          build_${name}
       fi
    fi
