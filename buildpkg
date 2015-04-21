@@ -1330,10 +1330,6 @@ build_mongodb()
         msg error "Failed to update $name version file."
         exit 1
     fi
-
-    # restart also php-fpm if available
-    stop_service php-fpm
-    start_service php-fpm
  fi
 
  cd $CWD
