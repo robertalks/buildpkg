@@ -54,6 +54,7 @@ Usage: ${NAME} [options...]
 
   OPTIONS:
     --help              display this message.
+    --check-all         check all installed package for updates.
     --pkg=package       build specific package.
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
@@ -286,6 +287,19 @@ get_dependency()
  msg info "Logfile saved in ${logfile}"
  ${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
  sleep 1
+}
+
+# do a version compare
+version_check()
+{
+ local old_version="$1"
+ local new_version="$2"
+
+ if [ "$old_version" = "$(echo -e "$old_version\n$new_version" | sort -V | head -n1)" ]; then
+    return 0
+ else
+    return 1
+ fi
 }
 
 # get package version
@@ -2787,12 +2801,23 @@ build_awstats()
 check_all()
 {
  local version
+ local new_version
 
  for name in ${PACKAGES}; do
     if $(is_pkg_installed $name); then
        version="$(get_pkg_version $name)"
        if [ "$version" != "0" ]; then
-          msg info "$name: $version" 
+          msg info "package: ${COL_YELLOW}$name${COL_RESET}"
+          new_version="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+          new_version="${!new_version}"
+          if [ "$new_version" != "" ]; then
+             if ! $(version_check "$new_version" "$version"); then
+                msg info "--- current version: $version"
+                msg info "--- new version: ${COL_RED}$new_version${COL_RESET} (update available)"
+             else
+                msg info "--- current version: $version"
+             fi
+          fi
        fi
     fi
  done
