@@ -1,8 +1,8 @@
 #!/bin/bash
 
 NAME="$(basename $0)"
-VERSION=1.0.3
-CWD=$(pwd)
+VERSION="1.0.4"
+CWD="$(pwd)"
 
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
@@ -94,19 +94,19 @@ set_global_conf()
 {
  local config_file=
 
- if [ -s /etc/buildpkg.conf ]; then
+ if [ -s "/etc/buildpkg.conf" ]; then
     source /etc/buildpkg.conf
-    config_file=/etc/buildpkg.conf
- elif [ -s $CWD/buildpkg.conf ]; then
+    config_file="/etc/buildpkg.conf"
+ elif [ -s "$CWD/buildpkg.conf" ]; then
     source $CWD/buildpkg.conf
-    config_file=$CWD/buildpkg.conf
- elif [ -s $CWD/.buildpkg.conf ]; then
-    source $CWD/.buildpkg.conf
-    config_file=$CWD/.buildpkg.conf
+    config_file="$CWD/buildpkg.conf"
+ elif [ -s "~/.buildpkg.conf" ]; then
+    source ~/.buildpkg.conf
+    config_file="~/.buildpkg.conf"
  else
     usage
     msg error "unable to find configuration file."
-    msg error "im looking for: /etc/${NAME}.conf or ~/${NAME}.conf or ~/.${NAME}.conf"
+    msg error "looking for: /etc/${NAME}.conf or $CWD/${NAME}.conf or ~/.${NAME}.conf"
     exit 1
  fi
 
@@ -156,6 +156,7 @@ set_global_conf()
  if [[ -z "$MAKEJOBS" ]] || [[ $MAKEJOBS -eq 0 ]]; then
     MAKEJOBS="$(grep -wc MHz /proc/cpuinfo 2>/dev/null)"
  fi
+
  if [ "$(uname -m)" = "x86_64" ]; then
     ARCH="x86_64"
  else
