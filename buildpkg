@@ -3,6 +3,7 @@
 NAME="$(basename $0)"
 VERSION="1.0.4"
 CWD="$(pwd)"
+ID="$(id -u)"
 
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
@@ -242,11 +243,9 @@ is_debian()
 # otherwise we can't really do anything
 is_sudo()
 {
- local uid="$(id -u 2>/dev/null)"
-
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     if [ ! -x /usr/bin/sudo ]; then
-       msg error "Sudo not found, we are running as normal user, we cant go on."
+       msg error "sudo command not found, we are running as normal user, we cant go on."
        msg error "Please install sudo as root and then try again, or run ${NAME} with root rights."
        exit 1
     fi
@@ -256,11 +255,10 @@ is_sudo()
 # download package (using apt-get)
 get_package()
 {
- local uid="$(id -u 2>/dev/null)"
  local args=$1
  local cmd="apt-get install -qq -f -y ${args}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
  msg info "Installing missing package: ${args}"
@@ -273,7 +271,6 @@ get_dependency()
  local name=$1
  local dlocal="${name}deps"
  local deps="${!dlocal}"
- local uid="$(id -u 2>/dev/null)"
  local cmd="apt-get install -q -f -y ${deps}"
  local logdir="$CWD/log"
  local logfile="${logdir}/${name}-dependencies.log"
@@ -281,7 +278,7 @@ get_dependency()
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
  msg info "Installing required dependencies for ${name}"
@@ -290,7 +287,7 @@ get_dependency()
  sleep 1
 }
 
-# do a version compare
+# do a version comparison
 version_check()
 {
  local old_version="$1"
@@ -580,7 +577,6 @@ run_make()
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-build.log
  local cmd=
- local uid="$(id -u 2>/dev/null)"
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
@@ -615,10 +611,9 @@ run_install()
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-install.log
  local cmd=
- local uid="$(id -u 2>/dev/null)"
 
  if [ ${installoff} -eq 0 ]; then
-    if [ $uid -ne 0 ]; then
+    if [ $ID -ne 0 ]; then
        cmd="sudo"
     fi
 
@@ -679,10 +674,9 @@ chown_as_root()
  local user=$1
  local group=$2
  local source=$3
- local uid="$(id -u 2>/dev/null)"
  local cmd="chown ${user}.${group} ${source}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
  if [ $(file ${source} |grep -qw directory >/dev/null 2>&1; echo $?) -eq 0 ]; then
@@ -697,10 +691,9 @@ chmod_as_root()
 {
  local mode=$1
  local source=$2
- local uid="$(id -u 2>/dev/null)"
  local cmd="chmod ${mode} ${source}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
@@ -712,10 +705,9 @@ mkdir_as_root()
 {
  local dir=$1
  local mode=$2
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -731,10 +723,9 @@ cp_as_root()
 {
  local source=$1
  local destination=$2
- local uid="$(id -u 2>/dev/null)"
  local cmd="cp -f ${source} ${destination}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
@@ -746,10 +737,9 @@ mv_as_root()
 {
  local source=$1
  local destination=$2
- local uid="$(id -u 2>/dev/null)"
  local cmd="mv ${source} ${destination}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
@@ -760,10 +750,9 @@ mv_as_root()
 rm_as_root()
 {
  local source=$1
- local uid="$(id -u 2>/dev/null)"
  local cmd="rm -fr ${source}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
@@ -775,10 +764,9 @@ ln_as_root()
 {
  local source=$1
  local destination=$2
- local uid="$(id -u 2>/dev/null)"
  local cmd="ln -sf ${source} ${destination}"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
@@ -788,10 +776,9 @@ ln_as_root()
 # run ldconfig
 ldconfig()
 {
- local uid="$(id -u 2>/dev/null)"
  local cmd="/sbin/ldconfig -r /"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
  
@@ -802,12 +789,11 @@ ldconfig()
 # create ldconfig file for cache
 ld_add()
 {
- local uid="$(id -u 2>/dev/null)"
  local content=$1
  local name=$2
  local cmd="sh -c"
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
  
@@ -822,14 +808,13 @@ ld_add()
 strip_dir()
 {
  local dir=$1
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
  if [ ${installoff} -eq 1 ]; then
     return;
  fi
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -846,14 +831,13 @@ strip_dir()
 strip_file()
 {
  local file=$1
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
  if [ ${installoff} -eq 1 ]; then
     return;
  fi
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -874,9 +858,8 @@ create_user()
  local geos=$3 # username geos
  local home=$4 # username home
  local cmd=
- local curruid="$(id -u 2>/dev/null)"
 
- if [ $curruid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -914,10 +897,9 @@ trigger()
 stop_service()
 {
  local name=$1
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -933,10 +915,9 @@ stop_service()
 start_service()
 {
  local name=$1
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -948,73 +929,18 @@ start_service()
  fi
 }
 
-# trigger build of mysql, very important
-need_mysql()
+# trigger missing package build
+need_pkg()
 {
- local name=$1
+ local name="$1"
+ local pkg="$2"
  local localall=$buildall
 
- export buildall=1
- if [ ! -x ${PREFIX}/mysql/bin/mysql_config ]; then
-   msg info "MySQL is not installed, we need it before building ${name}."
-   trigger mysql
+ if $(get_pkg_version $pkg); then
+    msg info "$pkg is not installed, we need it before building $name."
+    trigger $pkg
  fi
- export buildall=$localall
-}
 
-# trigger build of mongodb, very important
-need_mongodb()
-{
- local name=$1
- local localall=$buildall
-
- export buildall=1
- if [ ! -x ${PREFIX}/mongodb/sbin/mongod ]; then
-   msg info "MongoDB is not installed, we need it before building ${name}."
-   trigger mongodb
- fi
- export buildall=$localall
-}
-
-# trigger build of php, some packages need this
-need_php()
-{
- local name=$1
- local localall=$buildall
-
- export buildall=1
- if [ ! -x ${PREFIX}/php/bin/phpize ]; then
-   msg info "PHP is not available, we need it before building ${name}."
-   trigger php
- fi
- export buildall=$localall
-}
-
-# trigger build of nginx, some packages need this
-need_nginx()
-{
- local name=$1
- local localall=$buildall
-
- export buildall=1
- if [ ! -x ${PREFIX}/nginx/sbin/nginx ]; then
-   msg info "nginx is not available, we need it before building ${name}."
-   trigger nginx
- fi
- export buildall=$localall
-}
-
-# trigger build of clamav, some packages need this
-need_clamav()
-{
- local name=$1
- local localall=$buildall
-
- export buildall=1
- if [ ! -x ${PREFIX}/clamav/sbin/clamd ]; then
-   msg info "clamav is not available, we need it before building ${name}."
-   trigger clamav
- fi
  export buildall=$localall
 }
 
@@ -1033,10 +959,9 @@ build_mysql()
  local dbdir="${MYDB}/${name}"
  local db_install=0
  local date=$(date "+%Y%m%d")
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -1252,10 +1177,9 @@ build_mongodb()
  local mylogdir="${MYDB}/log/${name}"
  local logdir=$CWD/log
  local dbdir="${MYDB}/${name}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -1352,10 +1276,9 @@ build_nginx()
  local spawnurl="${SPAWN_FCGI_URL}"
  local wwwlog=/var/log/${name}
  local wwwdir=${DATA}/www
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -1549,15 +1472,14 @@ build_php()
  local dir="${name}-${version}"
  local url="${PHP_URL}"
  local wwwdir=${DATA}/www
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
  # we need to make sure mysql is already installed.
- need_mysql ${name}
+ need_pkg ${name} mysql
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1848,16 +1770,17 @@ build_php_mongo()
  local tarball="${name}-${version}.tgz"
  local dir="${name}-${version}"
  local url="${PHP_MONGO_URL}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
- # we need to make sure php is already installed.
- need_php ${name}
- need_mongodb ${name}
+ # we need to make sure that php is installed.
+ need_pkg ${name} php
+
+ # we need to make sure that mongodb is installed.
+ need_pkg ${name} mongodb
 
  [ -d build ] || mkdir -p build
  cd build
@@ -1908,15 +1831,14 @@ build_postfix()
  local lib="/var/lib/${name}"
  local vmaildir="${DATA}/mail/vmail"
  local date=$(date "+%Y%m%d")
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
- # we need to make sure mysql is already installed.
- need_mysql ${name}
+ # we need to make sure that mysql is installed.
+ need_pkg ${name} mysql
 
  [ -d build ] || mkdir -p build
  cd build
@@ -2091,10 +2013,9 @@ build_greyfix()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${GREYFIX_URL}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -2163,15 +2084,14 @@ build_dovecot()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${DOVECOT_URL}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
- # we need to make sure mysql is already installed.
- need_mysql ${name}
+ # we need to make sure that mysql is installed.
+ need_pkg ${name} mysql
 
  [ -d build ] || mkdir -p build
  cd build
@@ -2278,10 +2198,9 @@ build_clamav()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${CLAMAV_URL}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
@@ -2418,15 +2337,14 @@ build_clamsmtp()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${CLAMSMTP_URL}"
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
- # we need to make sure clamav is already installed.
- need_clamav ${name}
+ # we need to make sure that clamav is installed.
+ need_pkg ${name} clamav
 
  [ -d build ] || mkdir -p build
  cd build
@@ -2494,8 +2412,8 @@ build_pam_mysql()
  local dir="${name}-${version}"
  local url="${PAM_MYSQL_URL}"
 
- # we need to make sure mysql is already installed.
- need_mysql ${name}
+ # we need to make sure that mysql is installed.
+ need_pkg ${name} mysql
 
  [ -d build ] || mkdir -p build
  cd build
@@ -2573,25 +2491,24 @@ build_phpmyadmin()
  local dir="phpMyAdmin-${version}-all-languages"
  local url="${PHPMYADMIN_URL}"
  local wwwdir=${DATA}/www
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
  if [ ${installoff} -eq 1 ]; then
     msg warn "There is no install section for ${name}."
  fi
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
- # we need to make sure mysql is already installed.
- need_mysql ${name}
+ # we need to make sure that mysql is installed.
+ need_pkg ${name} mysql
 
- # we need to make sure nginx is already installed.
- need_nginx ${name}
+ # we need to make sure that nginx is installed.
+ need_pkg ${name} nginx
 
- # we need to make sure php is already installed.
- need_php ${name}
+ # we need to make sure that php is installed.
+ need_pkg ${name} php
 
  [ -d build ] || mkdir -p build
  cd build
@@ -2686,14 +2603,13 @@ build_awstats()
  local url="${AWSTATS_URL}"
  local wwwdir=${DATA}/www
  local wwwdata=${DATA}/${name}
- local uid="$(id -u 2>/dev/null)"
  local cmd=
 
  if [ ${installoff} -eq 1 ]; then
     msg warn "There is no install section for ${name}."
  fi
 
- if [ $uid -ne 0 ]; then
+ if [ $ID -ne 0 ]; then
     cmd="sudo"
  fi
 
