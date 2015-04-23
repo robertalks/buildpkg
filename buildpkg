@@ -936,7 +936,7 @@ need_pkg()
  local pkg="$2"
  local localall=$buildall
 
- if $(get_pkg_version $pkg); then
+ if $(is_pkg_installed $pkg); then
     msg info "$pkg is not installed, we need it before building $name."
     trigger $pkg
  fi
