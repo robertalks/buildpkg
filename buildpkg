@@ -2727,6 +2727,8 @@ check_all()
  for name in ${PACKAGES}; do
     if [ "$name" == "php_mongo" ]; then
        location="${PREFIX}/php/modules"
+    else
+       location=""
     fi
     if $(is_pkg_installed $name $location); then
        version="$(get_pkg_version $name $location)"
