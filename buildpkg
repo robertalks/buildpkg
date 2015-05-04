@@ -1288,8 +1288,6 @@ build_nginx()
  [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_pkg ${url} ${tarball}
- get_pkg ${fcgiurl} ${fcgitar}
- get_pkg ${spawnurl} ${spawntar}
 
  get_dependency ${name}
  unpack_source ${tarball}
@@ -1426,6 +1424,8 @@ build_fcgiwrap()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${spawnname} ] && rm -fr ${spawnname} || :
+
+ get_pkg ${spawnurl} ${spawntar}
 
  unpack_source ${spawntar}
  chown_dir ${spawnname}
