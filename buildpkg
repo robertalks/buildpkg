@@ -1429,7 +1429,6 @@ build_fcgiwrap()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${spawnname} ] && rm -fr ${spawnname} || :
- [ -d ${PREFIX}/${name} ] || mkdir -p ${PREFIX}/${name} || :
 
  get_pkg ${spawnurl} ${spawntar}
 
@@ -1483,6 +1482,10 @@ build_fcgiwrap()
     fi
 
     start_service ${name}
+
+    for dir in man share; do
+       rm_as_root "${PREFIX}/${name}/${dir}"
+    done
 
     if ! $(update_pkg_version "$name" "$version"); then
         msg error "Failed to update $name version file."
