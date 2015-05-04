@@ -1406,7 +1406,7 @@ build_fcgiwrap()
  local name="fcgiwrap"
  local version="${FCGIWRAP_VERSION}"
  local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
+ local dir="${name}-master"
  local url="${FCGIWRAP_URL}"
  local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
  local spawntar="${spawnname}.tar.gz"
@@ -1424,6 +1424,7 @@ build_fcgiwrap()
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${spawnname} ] && rm -fr ${spawnname} || :
+ [ -d ${PREFIX}/${name} ] || mkdir -p ${PREFIX}/${name} || :
 
  get_pkg ${spawnurl} ${spawntar}
 
