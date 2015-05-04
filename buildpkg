@@ -512,7 +512,8 @@ do_configure()
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
- if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" ]; then
+
+ if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" -a "${name}" != "fcgiwrap" ]; then
    ./configure \
       --prefix="$location" \
       --sysconfdir="$location/conf" \
@@ -537,6 +538,14 @@ do_configure()
       --http-scgi-temp-path="${TMPSRV}/${name}/scgi" \
       --http-uwsgi-temp-path="${TMPSRV}/${name}/uwsgi" \
       --pid-path="/var/run/${name}.pid" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+ elif [ "${name}" = "fcgiwrap" ]; then
+   ./configure \
+      --prefix="$location" \
+      --program-prefix="" \
+      --program-suffix="" \
+      --target="${TARGET}" \
+      --host="${TARGET}" \
+      --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "mysql" ]; then
    mkdir -p ${cwd}/build
    cd ${cwd}/build
