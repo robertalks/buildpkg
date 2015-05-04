@@ -495,14 +495,16 @@ apply_patch()
 # run configure for package
 do_configure()
 {
- local name=$1
- local args=$2
+ local name="$1"
+ local args="$2"
+ local location="$3"
  local cwd=$(pwd)
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-configure.log
 
- [ -d ${logdir} ] || mkdir -p ${logdir}
- [ -e ${logfile} ] && rm -f ${logfile} || :
+ [ -d "$logdir" ] || mkdir -p $logdir
+ [ -e "$logfile" ] && rm -f $logfile || :
+ [ -z "$location" ] && location="${PREFIX}/${name}"
 
  msg info "Running $ARCH architecture, using compiler flags:"
  msg info " -- CFLAGS: $CFLAGS"
@@ -510,27 +512,21 @@ do_configure()
 
  msg info "Configuring ${name} ..."
  msg info "Logfile saved in ${logfile}"
- if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" -a "${name}" != "fcgiwrap" -a "${name}" != "spawn-fcgi" ]; then
+ if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" ]; then
    ./configure \
-      --prefix="${PREFIX}/${name}" \
-      --sysconfdir="${PREFIX}/${name}/conf" \
-      --bindir="${PREFIX}/${name}/bin" \
-      --sbindir="${PREFIX}/${name}/sbin" \
-      --libdir="${PREFIX}/${name}/lib${LIBSUFFIX}" \
+      --prefix="$location" \
+      --sysconfdir="$location/conf" \
+      --bindir="$location/bin" \
+      --sbindir="$location/sbin" \
+      --libdir="$location/lib${LIBSUFFIX}" \
       --program-prefix="" \
       --program-suffix="" \
       --target="${TARGET}" \
       --host="${TARGET}" \
       --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- elif [ "${name}" = "fcgiwrap" -o "${name}" = "spawn-fcgi" ]; then
-   ./configure \
-     --prefix="${PREFIX}/nginx" \
-     --target="${TARGET}" \
-     --host="${TARGET}" \
-     --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "nginx" ]; then
    ./configure \
-      --prefix="${PREFIX}/${name}" \
+      --prefix="$location" \
       --conf-path="${PREFIX}/${name}/conf/nginx.conf" \
       --sbin-path="${PREFIX}/${name}/sbin/${name}" \
       --http-log-path="/var/log/${name}/access.log" \
@@ -546,17 +542,17 @@ do_configure()
    cd ${cwd}/build
    cmake \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="${PREFIX}/${name}" \
-    -DINSTALL_SYSCONFDIR="${PREFIX}/${name}/conf" \
+    -DCMAKE_INSTALL_PREFIX="$location" \
+    -DINSTALL_SYSCONFDIR="$location/conf" \
     ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
  elif [ "${name}" = "postfix" ]; then
    make makefiles \
     DEBUG="" \
     CCARGS=" \
      -DNO_NIS \
-     -DDEF_CONFIG_DIR="\\"\"${PREFIX}/${name}/conf\\"\"" \
-     -DDEF_COMMAND_DIR="\\"\"${PREFIX}/${name}/bin\\"\"" \
-     -DDEF_DAEMON_DIR="\\"\"${PREFIX}/${name}/libexec\\"\"" \
+     -DDEF_CONFIG_DIR="\\"\"$location/conf\\"\"" \
+     -DDEF_COMMAND_DIR="\\"\"$location/bin\\"\"" \
+     -DDEF_DAEMON_DIR="\\"\"$location/libexec\\"\"" \
      -DUSE_TLS \
      -DUSE_SASL_AUTH \
      -DHAS_SSL \
@@ -1432,7 +1428,7 @@ build_fcgiwrap()
  chown_dir ${spawnname}
  cd ${spawnname} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- do_configure spawn-fcgi
+ do_configure spawn-fcgi " " "${PREFIX}/${name}"
  run_make spawn-fcgi
  run_install spawn-fcgi
 
