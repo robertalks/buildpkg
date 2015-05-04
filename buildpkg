@@ -1396,6 +1396,8 @@ build_nginx()
 
     start_service ${name}
 
+    rm_as_root "${PREFIX}/${name}/html"
+
     if ! $(update_pkg_version "$name" "$version"); then
         msg error "Failed to update $name version file."
         exit 1
