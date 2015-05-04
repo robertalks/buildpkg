@@ -6,13 +6,14 @@ CWD="$(pwd)"
 ID="$(id -u)"
 
 # Do not modify this, this are the only supported applications.
-PACKAGES="mysql mongodb nginx php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
+PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
 libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
 mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
 libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev libstdc++6-4.4-dev"
 nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
+fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
 phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev \
 libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
 libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev \
@@ -31,7 +32,6 @@ libmilter1.0.1 libsys-hostname-long-perl libtommath-dev libtommath0 zlib1g-dev l
 clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
 pam_mysqldeps="libpam0g-dev"
 awstatsdeps="perl perl-modules"
-fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
 
 export buildall=0
 export triggeroff=0
@@ -1275,12 +1275,6 @@ build_nginx()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-${version}"
  local url="${NGINX_URL}"
- local fcginame="fcgiwrap-master"
- local fcgitar="fcgiwrap-${FCGIWRAP_VERSION}.tar.gz"
- local fcgiurl="${FCGIWRAP_URL}"
- local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
- local spawntar="${spawnname}.tar.gz"
- local spawnurl="${SPAWN_FCGI_URL}"
  local wwwlog=/var/log/${name}
  local wwwdir=${DATA}/www
  local cmd=
@@ -1406,8 +1400,29 @@ build_nginx()
  fi
 
  cd $CWD
+}
 
- # build spawn-fcgi
+# build and install fcgiwrap
+build_fcgiwrap()
+{
+ local name="fcgiwrap"
+ local version="${FCGIWRAP_VERSION}"
+ local tarball="${name}-${version}.tar.gz"
+ local dir="${name}-${version}"
+ local url="${FCGIWRAP_URL}"
+ local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
+ local spawntar="${spawnname}.tar.gz"
+ local spawnurl="${SPAWN_FCGI_URL}"
+ local cmd=
+
+ if [ $ID -ne 0 ]; then
+    cmd="sudo"
+ fi
+
+ # we need to make sure nginx is already installed.
+ need_pkg ${name} nginx
+
+ # build spawn-fcgi first (fcgiwrap requires it)
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${spawnname} ] && rm -fr ${spawnname} || :
@@ -1419,7 +1434,7 @@ build_nginx()
  do_configure spawn-fcgi
  run_make spawn-fcgi
  run_install spawn-fcgi
- 
+
  if [ ${installoff} -eq 0 ]; then
     strip_file ${PREFIX}/${name}/bin/spawn-fcgi
  fi
@@ -1429,24 +1444,25 @@ build_nginx()
  # build fcgiwrap
  [ -d build ] || mkdir -p build
  cd build
- [ -d ${fcginame} ] && rm -fr ${fcginame} || :
+ [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency fcgiwrap
+ get_pkg ${url} ${tarball}
 
- unpack_source ${fcgitar}
- chown_dir ${fcginame}
- cd ${fcginame} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+ get_dependency ${name}
+ unpack_source ${tarball}
+ chown_dir ${dir}
+ cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
  msg info "Running /usr/bin/autoreconf --install --force ..."
  /usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
-
- do_configure fcgiwrap
- run_make fcgiwrap
- run_install fcgiwrap
  
+ do_configure ${name}
+ run_make ${name}
+ run_install ${name}
+
  if [ ${installoff} -eq 0 ]; then
-    strip_file ${PREFIX}/${name}/sbin/fcgiwrap
+    strip_dir ${PREFIX}/${name}
 
     if [ ! -e /etc/init.d/fcgiwrap ]; then
        msg info "Copying start/stop script for fcgiwrap (/etc/init.d/fcgiwrap) ..."
@@ -1460,14 +1476,15 @@ build_nginx()
           /etc/init.d/fcgiwrap >/dev/null 2>&1
     fi
 
-    start_service fcgiwrap
+    start_service ${name}
 
-    for dir in html man share; do
-       rm_as_root "${PREFIX}/${name}/${dir}"
-    done
+    if ! $(update_pkg_version "$name" "$version"); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
- cd $CWD 
+ cd $CWD
 }
 
 # build and install php
