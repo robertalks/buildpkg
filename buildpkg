@@ -2802,7 +2802,7 @@ check_all()
     fi
  done
  if [ $pkg_count -eq 0 ]; then
-    msg warn "there are 0 packages to update."
+    msg info "there are 0 packages to update."
  else
     msg warn "there are $pkg_count packages to update."
  fi
