@@ -170,8 +170,8 @@ set_global_conf()
     TARGET="$ARCH-linux-gnu"
  fi
 
- # In some newer systems, pam modules are not in /lib/security, but some other place.
- PAM_MODULES_DIR=$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)
+ # In some newer systems, pam modules are not in /lib/security, but some other place, lets find out.
+ PAM_MODULES_DIR="$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)"
 
  export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD PAM_MODULES_DIR
 
@@ -217,7 +217,7 @@ set_global_conf()
 # generate random string, need it for phpmyadmin
 generate_random()
 {
- [ "$2" == "0" ] && CHAR="[:alnum:]" || CHAR="[:graph:]"
+ [ "$2" = "0" ] && CHAR="[:alnum:]" || CHAR="[:graph:]"
  cat /dev/urandom | tr -cd "$CHAR" | head -c ${1:-32}
  echo
 }
@@ -228,7 +228,7 @@ is_debian()
  local distro=
  if [ -x /usr/bin/lsb_release ]; then
    distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
-   if [ "$distro" == "Debian" -o "$distro" == "Ubuntu" ]; then
+   if [ "$distro" = "Debian" -o "$distro" = "Ubuntu" ]; then
       msg info "Running $distro, we can continue with the build."
    else
       msg error "We can only build packages on Debian based distribution."
@@ -956,7 +956,7 @@ need_pkg()
  local localall=$buildall
 
  if ! $(is_pkg_installed $pkg); then
-    msg info "$name requires $pkg, building and  installing $pkg."
+    msg info "$name requires $pkg, building and installing $pkg."
     build_$pkg
  fi
 
@@ -1059,12 +1059,6 @@ build_mysql()
        rm_as_root ${file}
     done
 
-    [ -e ${PREFIX}/${name}/bin/mysqlaccess ] && \
-    $cmd sed -i \
-       -e "/\$script_conf/ s|${PREFIX}/${name}|${PREFIX}/${name}/conf|g" \
-       -e "/my.cnf/ s|${PREFIX}/${name}|${PREFIX}/${name}/conf|g" \
-       ${PREFIX}/${name}/bin/mysqlaccess
-
     if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
        if [ -e ${PREFIX}/${name}/conf/my.cnf ]; then
           msg info "Backing up my.cnf configuration file to my.cnf.${date} ..."
@@ -1126,7 +1120,7 @@ build_mysql()
 
     if [ ${db_install} -eq 1 -a ${installoff} -eq 0 ]; then
        msg info "Updating default MySQL root user password ..."
-       $cmd ${PREFIX}/${name}/bin/mysqladmin \
+       $cmd ${PREFIX}/${name}/bin/mysqladmin --defaults-file=${PREFIX}/${name}/conf/my.cnf \
           -u root -h localhost password "${MYSQL_ROOT_PASSWORD}" >/dev/null 2>&1 || \
           msg error "Failed to update the MySQL root user password."
        msg info "Dropping all other MySQL users with empty passwords (for security reasons) ..."
@@ -2790,8 +2784,10 @@ check_all()
 
  pkg_count=0
  for name in ${PACKAGES}; do
-    if [ "$name" == "php_mongo" ]; then
+    if [ "$name" = "php_mongo" ]; then
        location="${PREFIX}/php/modules"
+    elif [ "$name" = "pam_mysql" ]; then
+       location="$PAM_MODULES_DIR"
     else
        location=""
     fi
