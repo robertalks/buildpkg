@@ -956,7 +956,7 @@ need_pkg()
  local localall=$buildall
 
  if ! $(is_pkg_installed $pkg); then
-    msg info "$pkg is not installed, we need it before building $name."
+    msg info "$name requires $pkg, building and  installing $pkg."
     build_$pkg
  fi
 
@@ -978,6 +978,8 @@ build_mysql()
  local dbdir="${MYDB}/${name}"
  local db_install=0
  local date=$(date "+%Y%m%d")
+ local __cflags=$CFLAGS
+ local __cxxflags=$CXXFLAGS
  local cmd=
 
  if [ $ID -ne 0 ]; then
@@ -998,8 +1000,8 @@ build_mysql()
  apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
  apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
 
- _cflags="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
- _cxxflags="${_cflags} -felide-constructors -fno-rtti"
+ export CFLAGS="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
+ export CXXFLAGS="${CFLAGS} -felide-constructors -fno-rtti"
 
  do_configure ${name} \
  "-DDEFAULT_CHARSET=utf8 \
@@ -1025,12 +1027,6 @@ build_mysql()
   -DINSTALL_PLUGINDIR=lib/mysql/plugin \
   -DMYSQL_DATADIR=${dbdir} \
   -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock \
-  -DCMAKE_C_FLAGS_RELWITHDEBINFO="${_cflags}" \
-  -DCMAKE_C_FLAGS_RELEASE="${_cflags}" \
-  -DCMAKE_C_FLAGS="${_cflags}" \
-  -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="${_cxxflags}" \
-  -DCMAKE_CXX_FLAGS_RELEASE="${_cxxflags}" \
-  -DCMAKE_CXX_FLAGS="${_cxxflags}" \
   -DCMAKE_EXE_LINKER_FLAGS='-Wl,--as-needed -pie -Wl,-z,relro,-z,now' \
   -DCMAKE_MODULE_LINKER_FLAGS='-Wl,--as-needed -pie -Wl,-z,relro,-z,now' \
   -DCMAKE_SHARED_LINKER_FLAGS='Wl,--as-needed -pie -Wl,-z,relro,-z,now'"
@@ -1173,6 +1169,9 @@ build_mysql()
         exit 1
     fi
  fi
+
+ export CFLAGS=$__cflags
+ export CXXFLAGS=$__cxxflags
 
  cd $CWD
 
