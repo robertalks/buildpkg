@@ -48,10 +48,10 @@ fi
 usage()
 {
  cat << EOF
-${NAME} script ${VERSION}
+$NAME script $VERSION
 Report bugs at <robert@linux-source.org>
 
-Usage: ${NAME} [options...]
+Usage: $NAME [options...]
 
   OPTIONS:
     --help              display this message.
@@ -62,9 +62,9 @@ Usage: ${NAME} [options...]
     --all               build all available packages.
 
   EXAMPLE:
-    ${NAME} --pkg=mysql (build mysql package)
+    $NAME --pkg=mysql (build mysql package)
       or
-    ${NAME} --all (build all packages available)
+    $NAME --all (build all packages available)
 
   AVAILABLE PACKAGES:
     ${PACKAGES}
@@ -80,13 +80,13 @@ msg()
 
  case "$type" in
    info)
-    echo -e "${NAME}: ${COL_GREEN}info${COL_RESET}: $message" ;;
+    echo -e "$NAME: ${COL_GREEN}info${COL_RESET}: $message" ;;
    warn)
-    echo -e "${NAME}: ${COL_YELLOW}warn${COL_RESET}: $message" ;;
+    echo -e "$NAME: ${COL_YELLOW}warn${COL_RESET}: $message" ;;
    error)
-    echo -e "${NAME}: ${COL_RED}error${COL_RESET}: $message" ;;
+    echo -e "$NAME: ${COL_RED}error${COL_RESET}: $message" ;;
    *)
-    echo -e "${NAME}: ${COL_RED}msg()${COL_RESET}: missing arguments, usage: \"msg info some_message\"" ;;
+    echo -e "$NAME: ${COL_RED}msg()${COL_RESET}: missing arguments, usage: \"msg info some_message\"" ;;
  esac
 }
 
@@ -107,7 +107,7 @@ set_global_conf()
  else
     usage
     msg error "unable to find configuration file."
-    msg error "looking for: /etc/${NAME}.conf or $CWD/${NAME}.conf or ~/.${NAME}.conf"
+    msg error "looking for: /etc/$NAME.conf or $CWD/$NAME.conf or ~/.$NAME.conf"
     exit 1
  fi
 
@@ -170,7 +170,10 @@ set_global_conf()
     TARGET="$ARCH-linux-gnu"
  fi
 
- export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD
+ # In some newer systems, pam modules are not in /lib/security, but some other place.
+ PAM_MODULES_DIR=$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)
+
+ export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD PAM_MODULES_DIR
 
  # This should not be touched.
  # We need the proper versions of the applications which we want to build.
@@ -246,7 +249,7 @@ is_sudo()
  if [ $ID -ne 0 ]; then
     if [ ! -x /usr/bin/sudo ]; then
        msg error "sudo command not found, we are running as normal user, we cant go on."
-       msg error "Please install sudo as root and then try again, or run ${NAME} with root rights."
+       msg error "Please install sudo as root and then try again, or run $NAME with root rights."
        exit 1
     fi
  fi
@@ -406,7 +409,7 @@ get_pkg()
  cd ${srcdir}
 
  if [ ! -e ${src} ]; then
-    echo -en "${NAME}: ${COL_GREEN}info${COL_RESET}: Fetching source archive ${src}: "
+    echo -en "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching source archive ${src}: "
     download "${url}" "${src}"
  else
     msg warn "Source archive ${src} already exists."
@@ -443,7 +446,7 @@ get_patch()
 
  url="${url}/${patchname}"
  if [ ! -e ${patchname} ]; then
-    echo -ne "${NAME}: ${COL_GREEN}info${COL_RESET}: Fetching patch file ${patchname}: "
+    echo -ne "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching patch file ${patchname}: "
     download "${url}" "${patchname}"
  else
     msg warn "Patch file ${patchname} already exists."
@@ -865,10 +868,10 @@ strip_file()
 create_user()
 {
  # example: create_user www 10100 "Web User" /home/www
- local user=$1 # username
- local uid=$2  # uniq id
- local geos=$3 # username geos
- local home=$4 # username home
+ local user="$1" # username
+ local uid="$2"  # uniq id
+ local geos="$3" # username geos
+ local home="$4" # username home
  local cmd=
 
  if [ $ID -ne 0 ]; then
@@ -891,17 +894,21 @@ create_user()
 # trigger package (re)build.
 trigger()
 {
- local name=$1
+ local name="$1"
+ local location
+
  if [ $triggeroff -eq 0 ]; then
-  if [ -n "${name}" ]; then
-     sleep 1
-     msg info "Triggered (re)build of ${name} ..."
-     build_${name} 2>/dev/null || msg error "Failed to (re)build ${name}."
-  else
-     msg warn "Nothing triggered ..."
-  fi
+    if [ -n "${name}" ]; then
+       if $(is_pkg_installed $name $location); then
+          sleep 1
+          msg info "Triggered re-build of ${name} ..."
+          build_${name} 2>/dev/null || msg error "Failed to re-build ${name}."
+       fi
+    else
+       msg warn "Nothing triggered ..."
+    fi
  else
-  msg warn "Trigger is disabled, ${name} wont be (re)build."
+    msg warn "Trigger is disabled, ${name} wont be re-build."
  fi
 }
 
@@ -941,7 +948,7 @@ start_service()
  fi
 }
 
-# trigger missing package build
+# build missing package
 need_pkg()
 {
  local name="$1"
@@ -950,7 +957,7 @@ need_pkg()
 
  if ! $(is_pkg_installed $pkg); then
     msg info "$pkg is not installed, we need it before building $name."
-    trigger $pkg
+    build_$pkg
  fi
 
  export buildall=$localall
@@ -1170,7 +1177,7 @@ build_mysql()
  cd $CWD
 
  if [ ${buildall} -eq 0 ]; then
-    trigger pam_mysql
+    trigger pam_mysql "$PAM_MODULES_DIR"
     trigger dovecot
     trigger postfix
     trigger php
@@ -1706,7 +1713,7 @@ build_php()
  cd $CWD
 
  if [ ${buildall} -eq 0 ]; then
-    trigger php_mongo
+    trigger php_mongo "${PREFIX}/php/modules"
  fi
 }
 
@@ -2468,7 +2475,10 @@ build_pam_mysql()
  apply_patch $CWD/patches/${name}_openssl.patch.gz 1
 
  # In some newer systems, pam modules are not in /lib/security, but some other place.
- PAM_MODULES_DIR=$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)
+ if [ "$PAM_MODULES_DIR" = "" ]; then
+    msg err "$name cant be build, unable to set PAM_MODULES_DIR"
+    exit 1
+ fi
 
  do_configure ${name} \
  "--with-openssl \
@@ -2484,6 +2494,11 @@ build_pam_mysql()
     rm_as_root ${PAM_MODULES_DIR}/${name}.la
     chmod_as_root 0644 ${PAM_MODULES_DIR}/${name}.so
     strip_file ${PAM_MODULES_DIR}/${name}.so
+
+    if ! $(update_pkg_version "$name" "$version" "${PAM_MODULES_DIR}" ); then
+        msg error "Failed to update $name version file."
+        exit 1
+    fi
  fi
 
  cd $CWD
