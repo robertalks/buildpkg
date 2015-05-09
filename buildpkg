@@ -122,7 +122,7 @@ set_global_conf()
  [ -z "$MONGODB_VERSION" ] && { msg error "MONGODB_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$FCGIWRAP_VERSION" ] && { msg error "FCGIWRAP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$SPAWN_FCGI_VERSION" ] && { msg error "SPAWN_FCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+ [ -z "$SPAWNFCGI_VERSION" ] && { msg error "SPAWNFCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_MONGO_VERSION" ] && { msg error "PHP_MONGO_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -140,7 +140,7 @@ set_global_conf()
  MONGODB_URL="http://downloads.mongodb.org/src/mongodb-src-r${MONGODB_VERSION}.tar.gz"
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
  FCGIWRAP_URL="https://github.com/gnosek/fcgiwrap/archive/master.tar.gz"
- SPAWN_FCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWN_FCGI_VERSION}.tar.gz"
+ SPAWNFCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWNFCGI_VERSION}.tar.gz"
  PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
  PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
@@ -182,7 +182,7 @@ set_global_conf()
  MONGODB_VERSION \
  NGINX_VERSION \
  FCGIWRAP_VERSION \
- SPAWN_FCGI_VERSION \
+ SPAWNFCGI_VERSION \
  PHP_VERSION \
  PHP_MONGO_VERSION \
  MONIT_VERSION \
@@ -1412,9 +1412,9 @@ build_fcgiwrap()
  local tarball="${name}-${version}.tar.gz"
  local dir="${name}-master"
  local url="${FCGIWRAP_URL}"
- local spawnname="spawn-fcgi-${SPAWN_FCGI_VERSION}"
+ local spawnname="spawn-fcgi-${SPAWNFCGI_VERSION}"
  local spawntar="${spawnname}.tar.gz"
- local spawnurl="${SPAWN_FCGI_URL}"
+ local spawnurl="${SPAWNFCGI_URL}"
  local cmd=
 
  if [ $ID -ne 0 ]; then
