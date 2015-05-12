@@ -660,7 +660,7 @@ run_install()
        $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
     fi
  else
-    msg warn "Install of package from source disabled."
+    msg warn "Package installation disabled from the command-line."
  fi 
 }
 
@@ -895,7 +895,7 @@ create_user()
 trigger()
 {
  local name="$1"
- local location
+ local location="$2"
 
  if [ $triggeroff -eq 0 ]; then
     if [ -n "${name}" ]; then
