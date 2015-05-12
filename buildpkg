@@ -575,8 +575,8 @@ do_configure()
      -DHAS_MYSQL -I${PREFIX}/mysql/include/mysql \
      -Wno-comments" \
     AUXLIBS=" \
-     -L${PREFIX}/mysql/lib${LIBSUFFIX} \
-     -Wl,-rpath ${PREFIX}/mysql/lib${LIBSUFFIX} \
+     -L${PREFIX}/mysql/lib \
+     -Wl,-rpath ${PREFIX}/mysql/lib \
      -lpcre \
      -lsasl2 -lssl -lcrypto \
      -lmysqlclient -lsqlite3 \
