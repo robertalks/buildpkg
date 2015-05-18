@@ -302,7 +302,7 @@ open_basedir = "@@DATA@@:@@TMPSRV@@/php/tmp"
 ; It receives a comma-delimited list of function names. This directive is
 ; *NOT* affected by whether Safe Mode is turned On or Off.
 ; http://php.net/disable-functions
-disable_functions = dl,exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec
+disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_multi_exec,parse_ini_file,show_source,phpinfo,dl
 
 ; This directive allows you to disable certain classes for security reasons.
 ; It receives a comma-delimited list of class names. This directive is
@@ -449,7 +449,7 @@ memory_limit = 64M
 ; Development Value: E_ALL
 ; Production Value: E_ALL & ~E_DEPRECATED & ~E_STRICT
 ; http://php.net/error-reporting
-error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED
+error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT
 
 ; This directive controls whether or not and where PHP will output errors,
 ; notices and warnings too. Error output is very useful during development, but
@@ -497,7 +497,7 @@ log_errors_max_len = 2048
 ; Do not log repeated messages. Repeated errors must occur in same file on same
 ; line unless ignore_repeated_source is set true.
 ; http://php.net/ignore-repeated-errors
-ignore_repeated_errors = Off
+ignore_repeated_errors = On
 
 ; Ignore source of message when ignoring repeated messages. When this setting
 ; is On you will not log errors with repeated messages from different files or
@@ -810,7 +810,7 @@ upload_tmp_dir = @@TMPSRV@@/php/tmp
 
 ; Maximum allowed size for uploaded files.
 ; http://php.net/upload-max-filesize
-upload_max_filesize = 2M
+upload_max_filesize = 1M
 
 ; Maximum number of files that can be uploaded via a single request
 max_file_uploads = 20

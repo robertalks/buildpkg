@@ -25,26 +25,21 @@ ulimit -n 2048
 user=www
 sanity()
 {
- [ -d /var/log/nginx ] || mkdir -p /var/log/nginx
+ [ -d /var/log/nginx ] || mkdir -p -m 0770 /var/log/nginx
  chown ${user}.root -R /var/log/nginx
  chmod 0770 /var/log/nginx
- mkdir -p @@TMPSRV@@/nginx
- mkdir -p @@TMPSRV@@/nginx/fastcgi
- mkdir -p @@TMPSRV@@/nginx/client
- mkdir -p @@TMPSRV@@/nginx/proxy
- mkdir -p @@TMPSRV@@/nginx/scgi
- mkdir -p @@TMPSRV@@/nginx/uwsgi
- chown ${user}.root -R @@TMPSRV@@/nginx
- chmod 0770 @@TMPSRV@@/nginx
- chmod 0770 @@TMPSRV@@/nginx/fastcgi
- chmod 0770 @@TMPSRV@@/nginx/client
- chmod 0770 @@TMPSRV@@/nginx/proxy
- chmod 0770 @@TMPSRV@@/nginx/scgi
- chmod 0770 @@TMPSRV@@/nginx/uwsgi
+ mkdir -p -m 0770 @@TMPSRV@@/nginx
+ mkdir -p -m 0770 @@TMPSRV@@/nginx/fastcgi
+ mkdir -p -m 0770 @@TMPSRV@@/nginx/client
+ mkdir -p -m 0770 @@TMPSRV@@/nginx/proxy
+ mkdir -p -m 0770 @@TMPSRV@@/nginx/scgi
+ mkdir -p -m 0770 @@TMPSRV@@/nginx/uwsgi
+ chown ${user}.${user} -R @@TMPSRV@@/nginx
 }
 
 start_nginx()
 {
+ sanity
  log_daemon_msg "Starting nginx http server" "$DESC"
  if start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
            --exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
@@ -63,11 +58,11 @@ stop_nginx()
  else
     log_end_msg 1
  fi
+ sanity
 }
 
 case "$1" in
   start)
-    sanity
     start_nginx
   ;;
 
