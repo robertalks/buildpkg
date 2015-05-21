@@ -1,3 +1,8 @@
+<html>
+<title>Test page</title>
+<body>
 <?php
- echo "mini-http-server and PHP works!"
+ echo "<b>mini-http-server and PHP works!</b>";
 ?>
+</body>
+</html>
