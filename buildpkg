@@ -1983,7 +1983,7 @@ build_postfix()
 
     if [ -e /etc/aliases ]; then
        msg info "Generating /etc/aliases.db for postfix ..."
-       ${PREFIX}/${name}/sbin/postalias /etc/aliases >/dev/null 2>&1
+       $cmd ${PREFIX}/${name}/sbin/postalias /etc/aliases >/dev/null 2>&1
        if [ $? -ne 0 ]; then
           msg error "Failed to generate /etc/aliases.db file."
        fi
@@ -2008,7 +2008,9 @@ build_postfix()
           -e "s|^manpage_directory.*|manpage_directory = ${PREFIX}/${name}/man|g" \
           -e "s|^sample_directory.*|sample_directory = ${PREFIX}/${name}/sample|g" \
           -e "s|^readme_directory.*|readme_directory = ${PREFIX}/${name}/doc|g" \
-         ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
+          ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
+       $cmd echo 'inet_interfaces = localhost' >> \
+          ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
     fi
 
     [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
