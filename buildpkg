@@ -2801,16 +2801,16 @@ check_all()
              if ! $(version_check "$new_version" "$old_version"); then
                 pkg_count=$(($pkg_count + 1))
                 msg info "package: ${COL_YELLOW}$name${COL_RESET}"
-                msg info "-> current version: $old_version, new version: ${COL_RED}$new_version${COL_RESET}"
+                msg info "-> new version: ${COL_RED}$new_version${COL_RESET}, current version: $old_version"
              fi
           fi
        fi
     fi
  done
  if [ $pkg_count -eq 0 ]; then
-    msg info "there are 0 packages to update."
+    msg info "there are 0 updates available."
  else
-    msg warn "there are $pkg_count packages to update."
+    msg warn "there are $pkg_count updates available."
  fi
 }
 
