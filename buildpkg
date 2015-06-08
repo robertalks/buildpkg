@@ -2789,11 +2789,8 @@ list_all()
        msg info "package: ${COL_YELLOW}$name${COL_RESET} version: $version"
     fi
  done
- if [ $pkg_count -eq 0 ]; then
-    msg info "${COL_RED}0${COL_RESET} packages installed."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
- fi
+
+ msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
 }
 
 # check whatever a package needs updating or not
@@ -2855,11 +2852,8 @@ check_all()
        fi
     fi
  done
- if [ $pkg_count -eq 0 ]; then
-    msg info "${COL_RED}0${COL_RESET} updates available."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
- fi
+
+ msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
 }
 
 # update package what have a new version
@@ -2897,11 +2891,8 @@ update_all()
        fi
     fi
  done
- if [ $pkg_count -eq 0 ]; then
-    msg info "${COL_RED}0${COL_RESET} packages updated."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
- fi
+
+ msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
 }
 
 
