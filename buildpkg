@@ -2792,7 +2792,7 @@ list_all()
  if [ $pkg_count -eq 0 ]; then
     msg info "${COL_RED}0${COL_RESET} packages installed."
  else
-    msg warn "${COL_RED}$pkg_count${COL_RESET} packages installed."
+    msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
  fi
 }
 
@@ -2858,7 +2858,7 @@ check_all()
  if [ $pkg_count -eq 0 ]; then
     msg info "${COL_RED}0${COL_RESET} updates available."
  else
-    msg warn "${COL_RED}$pkg_count${COL_RESET} updates available."
+    msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
  fi
 }
 
@@ -2900,7 +2900,7 @@ update_all()
  if [ $pkg_count -eq 0 ]; then
     msg info "${COL_RED}0${COL_RESET} packages updated."
  else
-    msg warn "${COL_RED}$pkg_count${COL_RESET} packages updated."
+    msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
  fi
 }
 
