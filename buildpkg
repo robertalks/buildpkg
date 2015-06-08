@@ -55,8 +55,9 @@ Usage: $NAME [options...]
 
   OPTIONS:
     --help              display this message.
-    --check-all         check all installed package for updates.
     --pkg=package       build specific package.
+    --check-all         check all installed package for available updates.
+    --update-all        update all installed package which have updates available.
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
     --all               build all available packages.
@@ -2784,6 +2785,8 @@ check_all()
  local location
  local pkg_count
 
+ is_debian
+
  pkg_count=0
  for name in ${PACKAGES}; do
     if [ "$name" = "php_mongo" ]; then
@@ -2808,11 +2811,52 @@ check_all()
     fi
  done
  if [ $pkg_count -eq 0 ]; then
-    msg info "there are 0 updates available."
+    msg info "0 updates available."
  else
-    msg warn "there are $pkg_count updates available."
+    msg warn "${COL_RED}$pkg_count${COL_RESET} updates available."
  fi
 }
+
+# update package what have a new version
+update_all()
+{
+ local old_version
+ local new_version
+ local location
+ local pkg_count
+
+ is_debian
+
+ pkg_count=0
+ for name in ${PACKAGES}; do
+    if [ "$name" = "php_mongo" ]; then
+       location="${PREFIX}/php/modules"
+    elif [ "$name" = "pam_mysql" ]; then
+       location="$PAM_MODULES_DIR"
+    else
+       location=""
+    fi
+    if $(is_pkg_installed $name $location); then
+       old_version="$(get_pkg_version $name $location)"
+       if [ "$old_version" != "0" ]; then
+          new_version="$(check_pkg $name $location)"
+          if [ "$new_version" != "0" ]; then
+             if ! $(version_check "$new_version" "$old_version"); then
+                pkg_count=$(($pkg_count + 1))
+		msg info "package ${COL_YELLOW}$name${COL_RESET} will be updated to version ${COL_RED}$new_version${COL_RESET}"
+		build_$name
+             fi
+          fi
+       fi
+    fi
+ done
+ if [ $pkg_count -eq 0 ]; then
+    msg info "0 packages updated."
+ else
+    msg warn "${COL_RED}$pkg_count${COL_RESET} packages updated."
+ fi
+}
+
 
 # build and install all available packages
 build_all()
@@ -2868,6 +2912,11 @@ while [ $# -gt 0 ]; do
 
   --check-all)
      check_all
+     exit 0
+  ;;
+
+  --update-all)
+     update_all
      exit 0
   ;;
 
