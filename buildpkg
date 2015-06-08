@@ -57,8 +57,9 @@ Usage: $NAME [options...]
   OPTIONS:
     --help              display this message.
     --pkg=package       build specific package.
-    --check-all         check all installed package for available updates.
-    --update-all        update all installed package which have updates available.
+    --list-all          list all installed packages.
+    --check-all         check all installed packages for available updates.
+    --update-all        update all installed packages which have updates available.
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
     --all               build all available packages.
@@ -2762,6 +2763,39 @@ build_awstats()
  cd $CWD
 }
 
+# list all install packages
+list_all()
+{
+ local version
+ local location
+ local pkg_count
+
+ is_debian
+
+ pkg_count=0
+ for name in ${PACKAGES}; do
+    if [ "$name" = "php_mongo" ]; then
+       location="${PREFIX}/php/modules"
+    elif [ "$name" = "pam_mysql" ]; then
+       location="$PAM_MODULES_DIR"
+    elif [ "$name" = "spf" ]; then
+       location="${PREFIX}/postfix/scripts"
+    else
+       location=""
+    fi
+    if $(is_pkg_installed $name $location); then
+       version="$(get_pkg_version $name $location)"
+       pkg_count=$(($pkg_count + 1))
+       msg info "package: ${COL_YELLOW}$name${COL_RESET}, version: $version"
+    fi
+ done
+ if [ $pkg_count -eq 0 ]; then
+    msg info "${COL_RED}0${COL_RESET} packages installed."
+ else
+    msg warn "${COL_RED}$pkg_count${COL_RESET} installed packages."
+ fi
+}
+
 # check whatever a package needs updating or not
 check_pkg()
 {
@@ -2822,7 +2856,7 @@ check_all()
     fi
  done
  if [ $pkg_count -eq 0 ]; then
-    msg info "0 updates available."
+    msg info "${COL_RED}0${COL_RESET} updates available."
  else
     msg warn "${COL_RED}$pkg_count${COL_RESET} updates available."
  fi
@@ -2864,7 +2898,7 @@ update_all()
     fi
  done
  if [ $pkg_count -eq 0 ]; then
-    msg info "0 packages updated."
+    msg info "${COL_RED}0${COL_RESET} packages updated."
  else
     msg warn "${COL_RED}$pkg_count${COL_RESET} packages updated."
  fi
@@ -2920,6 +2954,11 @@ while [ $# -gt 0 ]; do
  case "$1" in
   --help)
      usage
+     exit 0
+  ;;
+
+  --list-all)
+     list_all
      exit 0
   ;;
 
