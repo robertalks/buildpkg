@@ -2509,6 +2509,7 @@ build_spf()
 
  if [ ${installoff} -eq 1 ]; then
     msg warn "There is no install section for ${name}."
+    exit 1
  fi
 
  [ -d build ] || mkdir -p build
@@ -2528,6 +2529,11 @@ build_spf()
    ${PREFIX}/postfix/scripts >/dev/null 2>&1
  chmod_as_root 0755 ${PREFIX}/postfix/scripts/postfix-policyd-spf-perl
 
+ if ! $(update_pkg_version "spf" "$version" "${PREFIX}/postfix/scripts" ); then
+     msg error "Failed to update $name version file."
+     exit 1
+ fi
+
  cd $CWD
 }
 
@@ -2544,6 +2550,7 @@ build_phpmyadmin()
 
  if [ ${installoff} -eq 1 ]; then
     msg warn "There is no install section for ${name}."
+    exit 1
  fi
 
  if [ $ID -ne 0 ]; then
@@ -2653,6 +2660,7 @@ build_awstats()
 
  if [ ${installoff} -eq 1 ]; then
     msg warn "There is no install section for ${name}."
+    exit 1
  fi
 
  if [ $ID -ne 0 ]; then
@@ -2794,6 +2802,8 @@ check_all()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
+    elif [ "$name" = "spf" ]; then
+       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
@@ -2834,6 +2844,8 @@ update_all()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
+    elif [ "$name" = "spf" ]; then
+       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
