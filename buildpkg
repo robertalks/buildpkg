@@ -2786,13 +2786,13 @@ list_all()
     if $(is_pkg_installed $name $location); then
        version="$(get_pkg_version $name $location)"
        pkg_count=$(($pkg_count + 1))
-       msg info "package: ${COL_YELLOW}$name${COL_RESET}, version: $version"
+       msg info "package: ${COL_YELLOW}$name${COL_RESET} version: $version"
     fi
  done
  if [ $pkg_count -eq 0 ]; then
     msg info "${COL_RED}0${COL_RESET} packages installed."
  else
-    msg warn "${COL_RED}$pkg_count${COL_RESET} installed packages."
+    msg warn "${COL_RED}$pkg_count${COL_RESET} packages installed."
  fi
 }
 
@@ -2849,7 +2849,7 @@ check_all()
              if ! $(version_check "$new_version" "$old_version"); then
                 pkg_count=$(($pkg_count + 1))
                 msg info "package: ${COL_YELLOW}$name${COL_RESET}"
-                msg info "-> new version: ${COL_RED}$new_version${COL_RESET}, current version: $old_version"
+                msg info "-> new version: ${COL_RED}$new_version${COL_RESET} current version: $old_version"
              fi
           fi
        fi
