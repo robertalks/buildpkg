@@ -252,18 +252,15 @@ generate_random()
 is_debian()
 {
  local distro=
+ local message="This script requires a Debian/Ubuntu based distribution to function."
  if [ -x /usr/bin/lsb_release ]; then
    distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
-   if [ "$distro" = "Debian" -o "$distro" = "Ubuntu" ]; then
-      msg info "Running $distro, we can continue with the build."
-   else
-      msg error "We can only build packages on Debian based distribution."
+   if [ "$distro" != "Debian" -o "$distro" != "Ubuntu" ]; then
+      msg error "$message"
       exit 1
    fi
- elif [ -s /etc/debian_version ]; then
-   msg info "Running Debian (or some derivate), we can continue with the build."
- else
-   msg error "We can only build packages on Debian based distribution."
+ elif [ ! -s /etc/debian_version ]; then
+   msg error "$message"
    exit 1
  fi
 }
