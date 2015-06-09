@@ -11,9 +11,15 @@ PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot spf
 
 # Do not modify this, array of what packages each template contains
 tmpl_lemp=("nginx" "mysql" "php")
-tmpl_mail=("postfix" "dovecot" "greyfix" "spf" "clamsmtp")
+
+# NOTE: this will pull in mysql
+tmpl_mail=("postfix" "dovecot" "greyfix" "spf" "clamsmtp" "pam_mysql")
+
+# NOTE: this will pull in mysql, nginx
 tmpl_mongo=("mongodb" "php" "php_mongo")
-tmpl_extra=("monit" "pam_mysql" "phpmyadmin" "awstats")
+
+# NOTE: this will pull in mysql, nginx, php
+tmpl_extra=("monit" "phpmyadmin" "awstats")
 
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
 libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
@@ -43,7 +49,6 @@ awstatsdeps="perl perl-modules"
 export buildall=0
 export triggeroff=0
 export installoff=0
-export templateoff=0
 
 if [ -t 1 ]; then
   COL_RESET="\033[39;49;00m"
@@ -2917,11 +2922,15 @@ update_all()
 # build and install all available packages
 build_all()
 {
+ msg warn "Building all available packages: $(echo ${PACKAGES} | sed 's/ /, /g')"
+ msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
+ msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
+ read
+
  # check if is debian/ubuntu, if not exit,
  # we can't handle other type of distro's, yet.
  is_debian
 
- export buildall=1
  for name in ${PACKAGES}; do
     msg info "--- Building now package: ${COL_RED}${name}${COL_RESET}"
     build_${name}
@@ -2933,9 +2942,13 @@ build_template()
  local templ="$1"
 
  if [ -z "$templ" ]; then
-    msg error "You must specify a template (valid templates: lemp, mail, mongo, mail)"
+    msg error "You must specify a template (valid templates are: lemp, mail, mongo, mail)"
     exit 1
  fi
+
+ # check if is debian/ubuntu, if not exit,
+ # we can't handle other type of distro's, yet.
+ is_debian
  
  case "$templ" in
     lemp)
@@ -2967,7 +2980,7 @@ build_template()
     ;;
 
     *)
-       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates: lemp, mail, mongo, mail)"
+       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, mongo, mail)"
        exit 1
     ;;
 
@@ -3036,29 +3049,26 @@ while [ $# -gt 0 ]; do
   ;;
 
   --pkg=*)
+     export buildpkg=1
      if [ "$1" != "${1##--pkg=}" ]; then
         name="${1##--pkg=}"
      else
         name="$2"
-        shift
      fi
-     buildpkg=1
   ;;
 
   --template=*)
-     templateoff=1
      if [ "$1" != "${1##--template=}" ]; then
         tmpl="${1##--template=}"
      else
         tmpl="$2"
      fi
+     build_template $tmpl
+     exit 0
   ;;
 
   --all)
-     msg warn "Building all available packages: $(echo ${PACKAGES} | sed 's/ /, /g')"
-     msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
-     msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
-     read
+     export buildall=1
      build_all
      exit 0
   ;;
@@ -3072,10 +3082,7 @@ while [ $# -gt 0 ]; do
  shift
 done
 
-if [ $templateoff -eq 1 ]; then
-   build_template $tmpl
-   exit 0
-elif [ $buildpkg -eq 1 ]; then
+if [ $buildpkg -eq 1 ]; then
    if [ -z "${name}" ]; then
       usage
       msg error "missing package name."
