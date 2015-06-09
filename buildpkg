@@ -9,6 +9,9 @@ ID="$(id -u)"
 # Do not modify this, this are the only supported applications.
 PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
 
+# Do not modify this, this are the only supported templates.
+TEMPLATES="lemp mail mongo extra"
+
 mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
 libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
 mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
@@ -37,6 +40,7 @@ awstatsdeps="perl perl-modules"
 export buildall=0
 export triggeroff=0
 export installoff=0
+export templateoff=0
 
 if [ -t 1 ]; then
   COL_RESET="\033[39;49;00m"
@@ -62,6 +66,7 @@ Usage: $NAME [options...]
     --update-all        update all installed packages which have updates available.
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
+    --template=templ    build specific template.
     --all               build all available packages.
 
   EXAMPLE:
@@ -71,6 +76,9 @@ Usage: $NAME [options...]
 
   AVAILABLE PACKAGES:
     ${PACKAGES}
+
+  AVAILABLE TEMPLATES:
+    ${TEMPLATES}
 
 EOF
 }
@@ -2910,6 +2918,57 @@ build_all()
  done
 }
 
+build_template()
+{
+ local templ="$1"
+ local pkg_list
+
+ if [ -z "$templ" ]; then
+    msg error "You must specify a template (valid templates: lemp, mail, mongo, mail)"
+    exit 1
+ fi
+
+ case "$templ" in
+    lemp)
+        pkg_list=("nginx" "mysql" "php")
+        msg info "-> Building template $templ (${pkg_list[*]})"
+        for pkgs in ${pkg_list[@]}; do
+           build_$pkgs
+        done
+    ;;
+
+    mail)
+        pkg_list=("postfix" "dovecot" "greyfix" "spf" "clamsmtp")
+        msg info "-> Building template $templ (${pkg_list[*]})"
+        for pkgs in ${pkg_list[@]}; do
+           build_$pkgs
+        done
+    ;;
+
+    mongo)
+        pkg_list=("mongodb" "php_mongo")
+        msg info "-> Building template $templ (${pkg_list[*]})"
+        for pkgs in ${pkg_list[@]}; do
+           build_$pkgs
+        done
+    ;;
+
+    extra)
+        pkg_list=("monit" "pam_mysql" "phpmyadmin", "awstats");
+        msg info "-> Building template $templ (${pkg_list[*]})"
+        for pkgs in ${pkg_list[@]}; do
+           build_$pkgs
+        done
+    ;;
+
+    *)
+       msg error "$templ is not a valid template (valid templates: lemp, mail, mongo, mail)"
+       exit 1
+    ;;
+
+ esac
+}
+
 # trap Ctrl+C
 control_c()
 {
@@ -2975,10 +3034,19 @@ while [ $# -gt 0 ]; do
      if [ "$1" != "${1##--pkg=}" ]; then
         name="${1##--pkg=}"
      else
-        name=$2
+        name="$2"
         shift
      fi
      buildpkg=1
+  ;;
+
+  --template=*)
+     templateoff=1
+     if [ "$1" != "${1##--template=}" ]; then
+        tmpl="${1##--template=}"
+     else
+        tmpl="$2"
+     fi
   ;;
 
   --all)
@@ -2999,7 +3067,10 @@ while [ $# -gt 0 ]; do
  shift
 done
 
-if [ $buildpkg -eq 1 ]; then
+if [ $templateoff -eq 1 ]; then
+   build_template $tmpl
+   exit 0
+elif [ $buildpkg -eq 1 ]; then
    if [ -z "${name}" ]; then
       usage
       msg error "missing package name."
