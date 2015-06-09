@@ -2942,7 +2942,7 @@ build_template()
  local templ="$1"
 
  if [ -z "$templ" ]; then
-    msg error "You must specify a template (valid templates are: lemp, mail, mongo, mail)"
+    msg error "You must specify a template (valid templates are: lemp, mail, mongo, extra)"
     exit 1
  fi
 
@@ -2980,7 +2980,7 @@ build_template()
     ;;
 
     *)
-       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, mongo, mail)"
+       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, mongo, extra)"
        exit 1
     ;;
 
