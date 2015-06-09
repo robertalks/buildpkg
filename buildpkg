@@ -2936,38 +2936,38 @@ build_template()
     msg error "You must specify a template (valid templates: lemp, mail, mongo, mail)"
     exit 1
  fi
-
+ 
  case "$templ" in
     lemp)
-        msg info "-> Building template $templ (${tmpl_lemp[*]})"
+        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_lemp[*]})"
         for pkgs in ${tmpl_lemp[@]}; do
            build_$pkgs
         done
     ;;
 
     mail)
-        msg info "-> Building template $templ (${tmpl_mail[*]})"
+        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mail[*]})"
         for pkgs in ${tmpl_mail[@]}; do
            build_$pkgs
         done
     ;;
 
     mongo)
-        msg info "-> Building template $templ (${tmpl_mongo[*]})"
+        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mongo[*]})"
         for pkgs in ${tmpl_mongo[@]}; do
            build_$pkgs
         done
     ;;
 
     extra)
-        msg info "-> Building template $templ (${tmpl_extra[*]})"
+        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_extra[*]})"
         for pkgs in ${tmpl_extra[@]}; do
            build_$pkgs
         done
     ;;
 
     *)
-       msg error "$templ is not a valid template (valid templates: lemp, mail, mongo, mail)"
+       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates: lemp, mail, mongo, mail)"
        exit 1
     ;;
 
