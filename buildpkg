@@ -252,10 +252,11 @@ generate_random()
 is_debian()
 {
  local distro=
- local message="This script requires a Debian/Ubuntu based distribution to function."
+ local message="This script requires a Debian/Ubuntu based distribution to run."
+
  if [ -x /usr/bin/lsb_release ]; then
    distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
-   if [ "$distro" != "Debian" -o "$distro" != "Ubuntu" ]; then
+   if [ "$distro" != "Debian" -a "$distro" != "Ubuntu" ]; then
       msg error "$message"
       exit 1
    fi
@@ -3079,6 +3080,10 @@ while [ $# -gt 0 ]; do
  shift
 done
 
+# check if is debian/ubuntu, if not exit,
+# we can't handle other type of distro's, yet.
+is_debian
+
 if [ $buildpkg -eq 1 ]; then
    if [ -z "${name}" ]; then
       usage
@@ -3091,10 +3096,6 @@ if [ $buildpkg -eq 1 ]; then
          msg error "${name} package is not available at this moment."
          exit 1
       else
-         # check if is debian/ubuntu, if not exit,
-         # we can't handle other type of distro's, yet.
-         is_debian
-
          msg info "--- Building now package: ${COL_RED}${name}${COL_RESET}"
          build_${name}
       fi
