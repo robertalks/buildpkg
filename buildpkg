@@ -2811,7 +2811,11 @@ list_all()
     fi
  done
 
- msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
+ if [ $pkg_count -eq 0 ]; then
+    msg warn "there arent any installed packages."
+ else
+    msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
+ fi
 }
 
 # check whatever a package needs updating or not
@@ -2874,7 +2878,11 @@ check_all()
     fi
  done
 
- msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
+ if [ $pkg_count -eq 0 ]; then
+    msg warn "there arent any available updates."
+ else
+    msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
+ fi
 }
 
 # update package what have a new version
@@ -2913,7 +2921,11 @@ update_all()
     fi
  done
 
- msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
+ if [ $pkg_count -eq 0 ]; then
+    msg warn "there arent any packages to update."
+ else
+    msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
+ fi
 }
 
 
