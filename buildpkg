@@ -116,6 +116,45 @@ msg()
  esac
 }
 
+# dependecies and global variables
+set_deps_and_vars()
+{
+ # Do not modify this, this are the only supported applications.
+ PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
+
+ # Do not modify this, array of what packages each template contains
+ tmpl_lemp=("nginx" "mysql" "php")
+
+ # NOTE: this will pull in mysql
+ tmpl_mail=("postfix" "dovecot" "greyfix" "spf" "clamsmtp" "pam_mysql")
+
+ # NOTE: this will pull in mysql, nginx
+ tmpl_mongo=("mongodb" "php" "php_mongo")
+
+ # NOTE: this will pull in mysql, nginx, php
+ tmpl_extra=("monit" "phpmyadmin" "awstats")
+
+ mysqldeps="build-essential cmake g++-4.4 intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
+ libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
+ mongodbdeps="scons g++-4.4 intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
+ libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev libstdc++6-4.4-dev"
+ nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
+ fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
+ phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
+ libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
+ libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev libkrb5-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
+ monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev automake autoconf libtool"
+ postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
+ greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
+ dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev libkrb5-dev libcap-dev"
+ spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
+ clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl \
+ libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
+ clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
+ pam_mysqldeps="libpam0g-dev"
+ awstatsdeps="perl perl-modules"
+}
+
 # setup global variables
 set_global_conf()
 {
@@ -136,6 +175,9 @@ set_global_conf()
     msg error "looking for: /etc/$NAME.conf or $CWD/$NAME.conf or ~/.$NAME.conf"
     exit 1
  fi
+
+ # set global variables for deps and vars
+ set_deps_and_vars
 
  [ -z "$PREFIX" ] && PREFIX=/appls
  [ -z "$DATA" ] && DATA=/srv
@@ -3006,15 +3048,19 @@ control_c()
  exit $?
 }
 
+# check if is debian/ubuntu, if not exit,
+# we can't handle other type of distro's, yet.
+is_debian
+
+# check first if we have sudo, in case we run with non-root user.
+is_sudo
+
 OPTS="$@"
 if [ -z "${OPTS}" ]; then
    usage
    msg error "no arguments supplied." 1>&2
    exit 1
 fi
-
-# check first if we have sudo, in case we run with non-root user.
-is_sudo
 
 # set global variables before running anything.
 set_global_conf
@@ -3091,10 +3137,6 @@ while [ $# -gt 0 ]; do
  esac
  shift
 done
-
-# check if is debian/ubuntu, if not exit,
-# we can't handle other type of distro's, yet.
-is_debian
 
 if [ $buildpkg -eq 1 ]; then
    if [ -z "${name}" ]; then
