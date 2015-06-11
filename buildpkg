@@ -3016,20 +3016,21 @@ is_debian
 # check first if we have sudo, in case we run with non-root user.
 is_sudo
 
-OPTS="$@"
-if [ -z "${OPTS}" ]; then
-   usage
-   msg error "no arguments supplied." 1>&2
-   exit 1
-fi
-
 # set global variables before running anything.
 set_global_conf
 
 # set default gcc build flags CFLAGS/CXXFLAGS.
 set_cflags
 
+# trap Control + C
 trap control_c SIGINT
+
+OPTS="$@"
+if [ -z "${OPTS}" ]; then
+   usage
+   msg error "no arguments supplied." 1>&2
+   exit 1
+fi
 
 while [ $# -gt 0 ]; do
  case "$1" in
