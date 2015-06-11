@@ -2037,7 +2037,7 @@ build_postfix()
           -e "s|^readme_directory.*|readme_directory = ${PREFIX}/${name}/doc|g" \
           ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
        $cmd echo 'inet_interfaces = localhost' >> \
-          ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
+          ${PREFIX}/${name}/conf/main.cf 2>/dev/null
     fi
 
     [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
