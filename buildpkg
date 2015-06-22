@@ -1660,7 +1660,7 @@ build_php()
     fi
 
     if [ ! -e ${PREFIX}/${name}/conf/modules.d/modules.ini ]; then
-       msg info "Copying new configuration file for ${name} (${name}-modules.ini) ..."
+       msg info "Copying new configuration file for ${name} (modules.ini) ..."
        cp_as_root $CWD/config.d/${name}-modules.ini ${PREFIX}/${name}/conf/modules.d/modules.ini
     fi
 
@@ -1674,18 +1674,18 @@ build_php()
           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
           ${PREFIX}/${name}/conf/${name}-fpm.conf >/dev/null 2>&1
 
-       msg info "Copying new configuration file for default fpm pool (default-fpm-pool.conf) ..."
-       [ -e ${PREFIX}/${name}/conf/fpm.d/default-fpm-pool.conf ] && rm_as_root ${PREFIX}/${name}/conf/fpm.d/default-fpm-pool.conf
-       cp_as_root $CWD/config.d/default-fpm-pool.conf ${PREFIX}/${name}/conf/fpm.d/default-fpm-pool.conf
+       msg info "Copying new configuration file for default (www) pool (www.conf) ..."
+       [ -e ${PREFIX}/${name}/conf/fpm.d/www.conf ] && rm_as_root ${PREFIX}/${name}/conf/fpm.d/www.conf
+       cp_as_root $CWD/config.d/www-fpm-pool.conf ${PREFIX}/${name}/conf/fpm.d/www.conf
        $cmd sed -i \
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/fpm.d/default-fpm-pool.conf >/dev/null 2>&1
+          ${PREFIX}/${name}/conf/fpm.d/www.conf >/dev/null 2>&1
     
        $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
        chown_as_root root root ${PREFIX}/${name}/conf
        chmod_as_root 0644 ${PREFIX}/${name}/conf/${name}-fpm.conf
-       chmod_as_root 0644 ${PREFIX}/${name}/conf/fpm.d/default-fpm-pool.conf
+       chmod_as_root 0644 ${PREFIX}/${name}/conf/fpm.d/www.conf
     fi
 
     if [ ! -e /etc/init.d/${name}-fpm ]; then
