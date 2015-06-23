@@ -170,7 +170,7 @@ set_global_conf()
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
  FCGIWRAP_URL="https://github.com/gnosek/fcgiwrap/archive/master.tar.gz"
  SPAWNFCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWNFCGI_VERSION}.tar.gz"
- PHP_URL="http://www.php.net/distributions/php-${PHP_VERSION}.tar.bz2"
+ PHP_URL="http://php.net/distributions/php-${PHP_VERSION}.tar.bz2"
  PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
