@@ -2949,7 +2949,7 @@ build_all()
  for name in ${PACKAGES}; do
     ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
     ver="${!ver}"
-    msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} version $ver"
+    msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
     build_${name}
  done
 }
@@ -3103,7 +3103,7 @@ if [ -z "$pkg" ]; then
 else
    ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
    ver="${!ver}"
-   msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} version $ver"
+   msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
    build_${name}
 fi
 
