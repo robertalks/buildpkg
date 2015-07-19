@@ -2934,6 +2934,35 @@ update_all()
  fi
 }
 
+# build and install a specific package
+build_pkg()
+{
+ local name="$1"
+ local location=""
+ local ver=""
+
+ if [ -n "$name" ]; then
+    if [ "$name" = "php_mongo" ]; then
+       location="${PREFIX}/php/modules"
+    elif [ "$name" = "pam_mysql" ]; then
+       location="$PAM_MODULES_DIR"
+    elif [ "$name" = "spf" ]; then
+       location="${PREFIX}/postfix/scripts"
+    else
+       location=""
+    fi
+    if ! $(is_pkg_installed $name $location); then
+       ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+       ver="${!ver}"
+       msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
+       build_$name
+    else
+       msg warn "${COL_RED}${name}${COL_RESET} already installed."
+    fi
+ else
+    msg error "${COL_RED}${name}${COL_RESET} invalid package name or package not available."
+ fi
+}
 
 # build and install all available packages
 build_all()
@@ -2969,29 +2998,29 @@ build_template()
  case "$templ" in
     lemp)
         msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_lemp[*]})"
-        for pkgs in ${tmpl_lemp[@]}; do
-           build_$pkgs
+        for name in ${tmpl_lemp[@]}; do
+           build_pkg $name
         done
     ;;
 
     mail)
         msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mail[*]})"
-        for pkgs in ${tmpl_mail[@]}; do
-           build_$pkgs
+        for name in ${tmpl_mail[@]}; do
+           build_pkg $name
         done
     ;;
 
     mongo)
         msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mongo[*]})"
-        for pkgs in ${tmpl_mongo[@]}; do
-           build_$pkgs
+        for name in ${tmpl_mongo[@]}; do
+           build_pkg $name
         done
     ;;
 
     extra)
         msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_extra[*]})"
-        for pkgs in ${tmpl_extra[@]}; do
-           build_$pkgs
+        for name in ${tmpl_extra[@]}; do
+           build_pkg $name
         done
     ;;
 
