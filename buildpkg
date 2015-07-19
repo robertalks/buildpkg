@@ -419,8 +419,9 @@ download()
  if [ $? -eq 0 ]; then
     echo -e "${COL_GREEN}OK${COL_RESET}"
  else
-    echo -e "${COL_GREEN}Failed${COL_RESET}"
+    echo -e "${COL_RED}Failed${COL_RESET}"
     rm -f ${output} >/dev/null 2>&1
+    exit 1
  fi
 }
 
