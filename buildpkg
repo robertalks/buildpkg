@@ -180,7 +180,7 @@ set_global_conf()
  CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
- PHPMYADMIN_URL="http://downloads.sourceforge.net/project/phpmyadmin/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
+ PHPMYADMIN_URL="https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
  AWSTATS_URL="http://prdownloads.sourceforge.net/awstats/awstats-${AWSTATS_VERSION}.tar.gz"
 
  if [[ -z "$MAKEJOBS" ]] || [[ $MAKEJOBS -eq 0 ]]; then
