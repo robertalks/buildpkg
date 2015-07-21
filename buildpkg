@@ -146,6 +146,7 @@ set_global_conf()
  [ -z "$TMPSRV" ] && TMPSRV=/var/webservice
  [ -z "$HOST" ] && HOST="$(hostname -f)"
  [ -z "$MYSQL_ROOT_PASSWORD" ] && MYSQL_ROOT_PASSWORD="C00lCat"
+ [ -z "$VDA_PATCH_VERSION" ] && VDA_PATCH_VERSION="v13-2.10.0"
 
  [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONGODB_VERSION" ] && { msg error "MONGODB_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -162,7 +163,6 @@ set_global_conf()
  [ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$VDA_PATCH_VERSION" ] && { msg error "VDA_PATCH_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
  MYSQL_URL="https://downloads.mariadb.org/f/mariadb-${MYSQL_VERSION}/source/mariadb-${MYSQL_VERSION}.tar.gz"
@@ -1681,6 +1681,7 @@ build_php()
        $cmd sed -i \
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
+          -e "s|@@DATA@@|${DATA}/www|g" \
           ${PREFIX}/${name}/conf/fpm.d/www.conf >/dev/null 2>&1
     
        $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
@@ -1755,7 +1756,6 @@ build_monit()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
- # apply_patch $CWD/patches/monit_fix_missing.patch.gz 1
 
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
  msg info "Running /usr/bin/autoreconf --install --force ..."
@@ -1910,14 +1910,12 @@ build_postfix()
  [ -d ${dir} ] && rm -fr ${dir} || :
 
  get_dependency ${name}
-
  get_pkg ${url} ${tarball}
- get_patch http://vda.sourceforge.net/VDA postfix-vda-${VDA_PATCH_VERSION}.patch
 
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch 1
+ apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch.gz 1
 
  do_configure ${name}
  export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
