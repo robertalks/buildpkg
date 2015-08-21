@@ -48,7 +48,7 @@ update_per_domain()
 		if [ $? -ne 0 ]; then
 			msg_error "failed to update web statistics for domain ${domain}."
 			exit 1
-     		fi
+		fi
 	else
 		msg_error "missing awstats domain ${domain} configuration file."
 		exit 1
