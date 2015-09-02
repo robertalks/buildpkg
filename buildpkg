@@ -3110,6 +3110,22 @@ while [ $# -gt 0 ]; do
 
   --pkg=*)
      name="${1##--pkg=}"
+     if [ -n "${name}" ]; then
+        if $(echo ${PACKAGES} | grep -qw ${name} 2>/dev/null); then
+           ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+           ver="${!ver}"
+           msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
+           build_${name}
+        else
+           msg error "${name} package is not available at this moment."
+           exit 1
+        fi
+     else
+        msg error "package name not specified."
+        exit 1
+     fi
+     exit 0
+        
   ;;
 
   --template=*)
@@ -3132,23 +3148,5 @@ while [ $# -gt 0 ]; do
  esac
  shift
 done
-
-if [ -z "${name}" ]; then
-   usage
-   msg error "package name not specified."
-   exit 1
-fi
-
-pkg=$(echo ${PACKAGES} | grep -w ${name} 2>/dev/null)
-if [ -z "$pkg" ]; then
-   usage
-   msg error "${name} package is not available at this moment."
-   exit 1
-else
-   ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
-   ver="${!ver}"
-   msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
-   build_${name}
-fi
 
 exit 0
