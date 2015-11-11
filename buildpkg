@@ -670,6 +670,7 @@ run_install()
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-install.log
  local cmd=
+ local systemd_cmd=
 
  if [ ${installoff} -eq 0 ]; then
     if [ $ID -ne 0 ]; then
@@ -702,6 +703,20 @@ run_install()
     else
        msg info "Installing ${name} from compiled source (make install)"
        $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+    fi
+
+    systemd_cmd="none"
+    if [ -x "/bin/systemctl" ]; then
+       systemd_cmd="/bin/systemctl"
+    elif [ -x "/usr/bin/systemctl" ]; then
+       systemd_cmd="/usr/bin/systemctl"
+    fi
+
+    if [ "$systemd_cmd" == "none" ]; then
+       msg info "systemd not avaiable, skipping this part."
+    else
+       msg info "Running $systemd_cmd daemon-reload ..."
+       $cmd $systemd_cmd daemon-reload >/dev/null 2>&1 || msg warn "Fail to reload systemd manager configuration"
     fi
  else
     msg warn "Package installation disabled from the command-line."
