@@ -1049,8 +1049,6 @@ build_mysql()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
@@ -1058,6 +1056,8 @@ build_mysql()
  apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
  apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
  apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
+
+ get_dependency ${name}
 
  export CFLAGS="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
  export CXXFLAGS="${CFLAGS} -felide-constructors -fno-rtti"
@@ -1255,8 +1255,6 @@ build_mongodb()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
@@ -1265,6 +1263,8 @@ build_mongodb()
  apply_patch $CWD/patches/${name}_rename-unixSocketPrefix-to-socketpath.patch.gz 1
  sed -i "s|/data/db/|${dbdir}|" src/mongo/db/pdfile.cpp
  chmod_as_root 0644 README
+
+ get_dependency ${name}
 
  run_make ${name}
  run_install ${name}
@@ -1350,11 +1350,12 @@ build_nginx()
 
  get_pkg ${url} ${tarball}
 
- get_dependency ${name}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/nginx-drop-server-name.patch.gz 1
+
+ get_dependency ${name}
 
  do_configure ${name} \
  "--with-http_ssl_module \
@@ -1511,10 +1512,11 @@ build_fcgiwrap()
 
  get_pkg ${url} ${tarball}
 
- get_dependency ${name}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
  msg info "Running /usr/bin/autoreconf --install --force ..."
@@ -1576,13 +1578,12 @@ build_php()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
-
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  export EXTENSION_DIR=${PREFIX}/${name}/modules
  export PEAR_INSTALLDIR=${PREFIX}/${name}/pear
@@ -1780,13 +1781,13 @@ build_monit()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
+
+ get_dependency ${name}
 
  [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
  msg info "Running /usr/bin/autoreconf --install --force ..."
@@ -1940,13 +1941,13 @@ build_postfix()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
  get_pkg ${url} ${tarball}
-
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch.gz 1
+
+ get_dependency ${name}
 
  do_configure ${name}
  export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
@@ -2119,12 +2120,12 @@ build_greyfix()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  do_configure ${name} "--disable-dependency-tracking"
 
@@ -2193,12 +2194,12 @@ build_dovecot()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  do_configure ${name} \
  "--libexecdir=${PREFIX}/${name}/lib \
@@ -2304,14 +2305,14 @@ build_clamav()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
  create_user clamav 10108 "ClamAV Antivirus User" ${PREFIX}/${name}
+
+ get_dependency ${name}
 
  do_configure ${name} \
  "--with-user=clamav \
@@ -2446,13 +2447,13 @@ build_clamsmtp()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
  apply_patch $CWD/patches/${name}_use_mkstemp.patch.gz 1
+
+ get_dependency ${name}
 
  do_configure ${name} "--disable-dependency-tracking"
 
@@ -2515,8 +2516,6 @@ build_pam_mysql()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
@@ -2528,6 +2527,8 @@ build_pam_mysql()
     msg err "$name cant be build, unable to set PAM_MODULES_DIR"
     exit 1
  fi
+
+ get_dependency ${name}
 
  do_configure ${name} \
  "--with-openssl \
@@ -2571,12 +2572,12 @@ build_spf()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  mkdir_as_root ${PREFIX}/postfix/scripts
  msg info "Installing ${name} script in ${PREFIX}/postfix/scripts ..."
@@ -2726,12 +2727,12 @@ build_awstats()
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
 
- get_dependency ${name}
-
  get_pkg ${url} ${tarball}
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+
+ get_dependency ${name}
 
  mkdir_as_root ${PREFIX}/${name}/conf 0755
  mkdir_as_root ${PREFIX}/${name}/bin 0755
