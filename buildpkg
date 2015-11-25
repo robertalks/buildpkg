@@ -1056,6 +1056,7 @@ build_mysql()
  apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
  apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
  apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
+ apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
 
  get_dependency ${name}
 
