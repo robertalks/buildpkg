@@ -121,8 +121,8 @@ set_deps_and_vars()
  libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
  mongodbdeps="scons g++ intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
  libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev"
- if [ "$distro_release" ~= 8.* ]; then
-    mongodbdeps="$mongodbdeps libstdc++6-4.9-dev"
+ if [[ "$distro_release" =~ 8.* ]]; then
+    mongodbdeps="$mongodbdeps libstdc++-4.9-dev"
  else
     mongodbdeps="$mongodbdeps libstdc++6-4.7-dev"
  fi
