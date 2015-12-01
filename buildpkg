@@ -302,7 +302,7 @@ is_sudo()
 get_package()
 {
  local args=$1
- local cmd="apt-get install -qq -f -y ${args}"
+ local cmd="apt-get install --no-install-recommends -qq -f -y ${args}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
@@ -317,7 +317,7 @@ get_dependency()
  local name=$1
  local dlocal="${name}deps"
  local deps="${!dlocal}"
- local cmd="apt-get install -q -f -y ${deps}"
+ local cmd="apt-get install --no-install-recommends -q -f -y ${deps}"
  local logdir="$CWD/log"
  local logfile="${logdir}/${name}-dependencies.log"
 
@@ -1056,7 +1056,10 @@ build_mysql()
  apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
  apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
  apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
- apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
+
+ if [ "$version" == "10.0.22" ]; then
+    apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
+ fi
 
  get_dependency ${name}
 
