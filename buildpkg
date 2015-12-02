@@ -1090,10 +1090,9 @@ build_mysql()
  export CFLAGS="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
  export CXXFLAGS="${CFLAGS} -felide-constructors -fno-rtti"
 
- [ -r VERSION ] && sed -i "s/^MYSQL_VERSION_EXTRA=.*/MYSQL_VERSION_EXTRA=-buildpkg/" VERSION
-
  do_configure ${name} \
- "-DDEFAULT_CHARSET=utf8 \
+ "-DMYSQL_SERVER_SUFFIX=-buildpkg \
+  -DDEFAULT_CHARSET=utf8 \
   -DDEFAULT_COLLATION=utf8_general_ci \
   -DWITH_EXTRA_CHARSETS=complex \
   -DWITH_EMBEDDED_SERVER=1 \
