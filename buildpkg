@@ -566,6 +566,8 @@ enable_ccache()
     export CCACHE_DIR="$cache_dir"
     export CCACHE_PATH="/usr/bin"
     export PATH="/usr/lib/ccache/bin:$PATH"
+    export CC="/usr/bin/ccache"
+    export GCC="/usr/bin/ccache"
     /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
  else
     msg warn "ccache not available, please install it and try again."
@@ -588,6 +590,7 @@ do_configure()
  [ -z "$location" ] && location="${PREFIX}/${name}"
 
  if [ $ccacheon -eq 1 ]; then
+    msg info "ccache enabled, this will speed up the build."
     enable_ccache
  fi
 
@@ -673,9 +676,7 @@ run_make()
  local name="$1"
  local logdir="$CWD/log"
  local logfile="${logdir}/${name}-build.log"
- local cache_dir="$CWD/.ccache"
  local cmd=""
- local old_path="$PATH"
 
  start_counter="$(date +%s)"
 
