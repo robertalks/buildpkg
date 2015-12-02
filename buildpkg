@@ -1069,12 +1069,20 @@ build_mysql()
  unpack_source ${tarball}
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
- apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
- apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
 
+ if [[ "$version" =~ 10.0.* ]]; then
+    apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
+    apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
+    apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
+ fi
+
+ # only version 10.0.22 has this issue, we will drop it soon
  if [ "$version" == "10.0.22" ]; then
     apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
+ fi
+
+ if [[ "$version" =~ 10.1.* ]]; then
+    apply_patch $CWD/patches/mariadb_10.1.x-dont-build-examples-and-tests.patch.gz 1
  fi
 
  get_dependency ${name}
