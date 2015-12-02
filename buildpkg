@@ -654,6 +654,7 @@ run_make()
  local logfile="${logdir}/${name}-build.log"
  local cache_dir="$CWD/.ccache"
  local cmd=""
+ local old_path="$PATH"
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
@@ -677,10 +678,12 @@ run_make()
 
     if [ $ccacheon -eq 1 ]; then
        if [ -x /usr/bin/ccache ]; then
-          [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg warn "failed to create $cache_dir directory."; exit 1; }
+          [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg error "failed to create $cache_dir directory."; exit 1; }
           export CCACHE_DIR="$cache_dir"
-          ccache_opts="-M 10G"
-          cmd="ccache $ccache_opts $cmd"
+          export CCACHE_PATH="/usr/bin"
+          export PATH="/usr/lib/ccache/bin:$PATH"
+          /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
+          cmd="ccache $cmd"
           msg info "ccache enabled, this will speed up the build."
        else
           msg warn "ccache not available, please install it and try again."
@@ -691,6 +694,8 @@ run_make()
     msg info "Compiling ${name} source ($cmd)"
     msg info "Logfile saved in ${logfile}"
     $cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+
+    export PATH="$old_path"
  fi
  elapsed_time ${name}
 }
