@@ -44,6 +44,7 @@ Usage: $NAME [options...]
     --list-all          list all installed packages.
     --check-all         check all installed packages for available updates.
     --update-all        update all installed packages which have updates available.
+    --use-ccache        enable ccache, will speed up the build (default: disabled).
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
     --template=templ    build specific template.
@@ -73,18 +74,16 @@ EOF
 # display info, warning or error message
 msg()
 {
- local type=$1
- local message=$2
+ local level="$1"
+ local message="$2"
 
- case "$type" in
-   info)
-    echo -e "$NAME: ${COL_GREEN}info${COL_RESET}: $message" ;;
+ case "$level" in
    warn)
     echo -e "$NAME: ${COL_YELLOW}warn${COL_RESET}: $message" ;;
    error)
     echo -e "$NAME: ${COL_RED}error${COL_RESET}: $message" ;;
    *)
-    echo -e "$NAME: ${COL_RED}msg()${COL_RESET}: missing arguments, usage: \"msg info some_message\"" ;;
+    echo -e "$NAME: ${COL_GREEN}info${COL_RESET}: $message" ;;
  esac
 }
 
@@ -146,12 +145,13 @@ set_deps_and_vars()
  buildall=0
  triggeroff=0
  installoff=0
+ ccacheon=0
 }
 
 # setup global variables
 set_global_conf()
 {
- local config_file=
+ local config_file=""
 
  if [ -s "/etc/buildpkg.conf" ]; then
     source /etc/buildpkg.conf
@@ -286,7 +286,7 @@ generate_random()
 # check if we are running Debian or Ubuntu or some derivate.
 is_debian()
 {
- local distro=
+ local distro=""
  local message="This script requires a Debian/Ubuntu based distribution to run."
 
  if [ -x /usr/bin/lsb_release ]; then
@@ -317,7 +317,7 @@ is_sudo()
 # install missing package (using apt-get)
 get_package()
 {
- local args=$1
+ local args="$1"
  local cmd="apt-get install --no-install-recommends -qq -f -y ${args}"
 
  if [ $ID -ne 0 ]; then
@@ -330,7 +330,7 @@ get_package()
 # resolve dependencies for packages (using apt-get)
 get_dependency()
 {
- local name=$1
+ local name="$1"
  local dlocal="${name}deps"
  local deps="${!dlocal}"
  local cmd="apt-get install --no-install-recommends -q -f -y ${deps}"
@@ -343,6 +343,7 @@ get_dependency()
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
+
  msg info "Installing required dependencies for ${name}"
  msg info "Logfile saved in ${logfile}"
  ${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
@@ -440,8 +441,8 @@ set_cflags()
 # download function using wget
 download()
 {
- local url=$1
- local output=$2
+ local url="$1"
+ local output="$2"
 
  if [ ! -x /usr/bin/wget ]; then
     get_package wget
@@ -460,8 +461,8 @@ download()
 # download package source
 get_pkg()
 {
- local url=$1
- local src=$2
+ local url="$1"
+ local src="$2"
  local srcdir="${CWD}/sources"
  local localpwd="$(pwd)"
 
@@ -481,7 +482,7 @@ get_pkg()
 # unpack package source
 unpack_source()
 {
- local tarname=$1
+ local tarname="$1"
  local srcdir="${CWD}/sources"
 
  if [ ! -e ${srcdir}/${tarname} ]; then
@@ -495,8 +496,8 @@ unpack_source()
 # download patch
 get_patch()
 {
- local url=$1
- local patchname=$2
+ local url="$1"
+ local patchname="$2"
  local patchdir="${CWD}/patches"
  local patchfile="${patchdir}/${patchname}"
  local localpwd="$(pwd)"
@@ -518,8 +519,8 @@ get_patch()
 # apply patch
 apply_patch()
 {
- local patch_file=$1
- local strip=$2
+ local patch_file="$1"
+ local strip_level="$2"
  local logdir=$CWD/log
  local logfile=${logdir}/${name}-patches.log
  local cmd=
@@ -528,12 +529,12 @@ apply_patch()
     get_package patch
  fi
 
- if [ -s ${patch_file} ]; then
-    if [ $(file ${patch_file} |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
+ if [ -s "${patch_file}" ]; then
+    if [ $(file "${patch_file}" |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
        cmd=cat
-    elif [ $(file ${patch_file} |grep -qw gzip >/dev/null 2>&1; echo $?) -eq 0 ]; then
+    elif [ $(file "${patch_file}" |grep -qw gzip >/dev/null 2>&1; echo $?) -eq 0 ]; then
        cmd=zcat
-    elif [ $(file ${patch_file} |grep -qw bzip2 >/dev/null 2>&1; echo $?) -eq 0 ]; then
+    elif [ $(file "${patch_file}" |grep -qw bzip2 >/dev/null 2>&1; echo $?) -eq 0 ]; then
        cmd=bzcat
     else
        msg warn "unable to determine patch file type."
@@ -544,7 +545,7 @@ apply_patch()
        msg info "Applying patch ${patch_file} ..."
        msg info "Logfile saved in ${logfile}"
        echo "applying patch ${patch_file} ..." >> ${logfile}
-       $cmd ${patch_file} | patch -p${strip} >> ${logfile} 2>&1
+       $cmd ${patch_file} | patch -p${strip_level} >> ${logfile} 2>&1
        if [ $? -ne 0 ]; then
           msg error "unable to apply patch ${patch_file}."
           exit $?
@@ -561,9 +562,9 @@ do_configure()
  local name="$1"
  local args="$2"
  local location="$3"
- local cwd=$(pwd)
- local logdir=$CWD/log
- local logfile=${logdir}/${name}-configure.log
+ local cwd="$(pwd)"
+ local logdir="$CWD/log"
+ local logfile="${logdir}/${name}-configure.log"
 
  [ -d "$logdir" ] || mkdir -p $logdir
  [ -e "$logfile" ] && rm -f $logfile || :
@@ -648,10 +649,11 @@ do_configure()
 # build package from source
 run_make()
 {
- local name=$1
- local logdir=$CWD/log
- local logfile=${logdir}/${name}-build.log
- local cmd=
+ local name="$1"
+ local logdir="$CWD/log"
+ local logfile="${logdir}/${name}-build.log"
+ local cache_dir="$CWD/.ccache"
+ local cmd=""
 
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
@@ -663,18 +665,31 @@ run_make()
    SCONS_OPT="${SCONS_OPT} --32"
  fi
 
+ start_counter="$(date +%s)"
  if [ "${name}" = "mongodb" ]; then
     export CPPFLAGS="$CFLAGS"
     msg info "Running $ARCH architecture, without compiler flags."
     msg info "Compiling ${name} source (scons -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name})"
     msg info "Logfile saved in ${logfile}"
-    start_counter="$(date +%s)"
     scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
  else 
-    msg info "Compiling ${name} source (make -j${MAKEJOBS})"
+    cmd="make -j${MAKEJOBS}"
+
+    if [ $ccacheon -eq 1 ]; then
+       if [ -x /usr/bin/ccache ]; then
+          [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg warn "failed to create $cache_dir directory."; exit 1; }
+          ccache_opts="-M 10G -o cache_dir=$cache_dir"
+          cmd="ccache $ccache_opts $cmd"
+          msg info "ccache enabled, this will speed up the build."
+       else
+          msg warn "ccache not available, please install it and try again."
+          sleep 1
+       fi
+    fi
+
+    msg info "Compiling ${name} source ($cmd)"
     msg info "Logfile saved in ${logfile}"
-    start_counter="$(date +%s)"
-    make -j${MAKEJOBS} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+    $cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
  fi
  elapsed_time ${name}
 }
@@ -682,10 +697,10 @@ run_make()
 # install package from build source
 run_install()
 {
- local name=$1
- local logdir=$CWD/log
- local logfile=${logdir}/${name}-install.log
- local cmd=
+ local name="$1"
+ local logdir="$CWD/log"
+ local logfile="${logdir}/${name}-install.log"
+ local cmd=""
 
  if [ ${installoff} -eq 0 ]; then
     if [ $ID -ne 0 ]; then
@@ -727,7 +742,7 @@ run_install()
 
 elapsed_time()
 {
- local name=$1
+ local name="$1"
 
  end_counter="$(date +%s)"
  diff_timer="$((${end_counter} - ${start_counter}))"
@@ -738,7 +753,7 @@ elapsed_time()
 # change ownership to running user
 chown_dir()
 {
- local dir=$1
+ local dir="$1"
  local whoami="$(whoami)"
 
  chown ${whoami}.${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
@@ -747,41 +762,41 @@ chown_dir()
 # change ownership as root
 chown_as_root()
 {
- local user=$1
- local group=$2
- local source=$3
- local cmd="chown ${user}.${group} ${source}"
+ local user="$1"
+ local group="$2"
+ local src="$3"
+ local cmd="chown ${user}.${group} ${src}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
- if [ $(file ${source} |grep -qw directory >/dev/null 2>&1; echo $?) -eq 0 ]; then
+ if [ $(file "${src}" |grep -qw directory >/dev/null 2>&1; echo $?) -eq 0 ]; then
     cmd="${cmd} -R"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to change ownership on ${source} to ${user}.${group}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to change ownership on ${src} to ${user}.${group}."
 }
 
 # change rights as root
 chmod_as_root()
 {
- local mode=$1
- local source=$2
- local cmd="chmod ${mode} ${source}"
+ local mode="$1"
+ local src="$2"
+ local cmd="chmod ${mode} ${src}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to change rights on ${source}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to change rights on ${src}."
 }
 
 # create directories as root
 mkdir_as_root()
 {
- local dir=$1
- local mode=$2
- local cmd=
+ local dir="$1"
+ local mode="$2"
+ local cmd=""
 
  if [ $ID -ne 0 ]; then
     cmd="sudo"
@@ -797,56 +812,56 @@ mkdir_as_root()
 # copy as root
 cp_as_root()
 {
- local source=$1
- local destination=$2
- local cmd="cp -f ${source} ${destination}"
+ local src="$1"
+ local dest="$2"
+ local cmd="cp -f ${src} ${dest}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to copy ${source} to ${destination}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to copy ${src} to ${dest}."
 }
 
 # move as root
 mv_as_root()
 {
- local source=$1
- local destination=$2
- local cmd="mv ${source} ${destination}"
+ local src="$1"
+ local dest="$2"
+ local cmd="mv ${src} ${dest}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to move ${source} to ${destination}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to move ${src} to ${dest}."
 }
 
 # delete as root
 rm_as_root()
 {
- local source=$1
- local cmd="rm -fr ${source}"
+ local src="$1"
+ local cmd="rm -fr ${src}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to delete ${source}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to delete ${src}."
 }
 
 # create link as root
 ln_as_root()
 {
- local source=$1
- local destination=$2
- local cmd="ln -sf ${source} ${destination}"
+ local src="$1"
+ local dest="$2"
+ local cmd="ln -sf ${src} ${dest}"
 
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to create link for ${source} to ${destination}."
+ $cmd >/dev/null 2>&1 || msg error "Failed to create link for ${src} to ${dest}."
 }
 
 # run ldconfig
@@ -865,8 +880,8 @@ ldconfig()
 # create ldconfig file for cache
 ld_add()
 {
- local content=$1
- local name=$2
+ local content="$1"
+ local name="$2"
  local cmd="sh -c"
 
  if [ $ID -ne 0 ]; then
@@ -883,8 +898,8 @@ ld_add()
 # strip directory
 strip_dir()
 {
- local dir=$1
- local cmd=
+ local dir="$1"
+ local cmd=""
 
  if [ ${installoff} -eq 1 ]; then
     return;
@@ -906,8 +921,8 @@ strip_dir()
 # strip file
 strip_file()
 {
- local file=$1
- local cmd=
+ local file="$1"
+ local cmd=""
 
  if [ ${installoff} -eq 1 ]; then
     return;
@@ -933,7 +948,7 @@ create_user()
  local uid="$2"  # uniq id
  local geos="$3" # username geos
  local home="$4" # username home
- local cmd=
+ local cmd=""
 
  if [ $ID -ne 0 ]; then
     cmd="sudo"
@@ -976,8 +991,8 @@ trigger()
 # stop server/service
 stop_service()
 {
- local name=$1
- local cmd=
+ local name="$1"
+ local cmd=""
 
  if [ $ID -ne 0 ]; then
     cmd="sudo"
@@ -994,8 +1009,8 @@ stop_service()
 # start server/service
 start_service()
 {
- local name=$1
- local cmd=
+ local name="$1"
+ local cmd=""
  local systemd_cmd="none"
 
  if [ $ID -ne 0 ]; then
@@ -3148,6 +3163,10 @@ while [ $# -gt 0 ]; do
   --update-all)
      update_all
      exit 0
+  ;;
+
+  --use-ccache)
+     export ccacheon=1
   ;;
 
   --dont-trigger)
