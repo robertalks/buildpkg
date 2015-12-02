@@ -118,7 +118,7 @@ set_deps_and_vars()
  tmpl_extra=("monit" "phpmyadmin" "awstats")
 
  mysqldeps="build-essential cmake g++ intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
- libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev"
+ libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev pkg-config"
  mongodbdeps="scons g++ intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
  libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev"
  if [[ "$distro_release" =~ 8.* ]]; then
@@ -1102,6 +1102,11 @@ build_mysql()
   -DWITH_JEMALLOC=system \
   -DWITH_READLINE=0 \
   -DWITH_LIBWRAP=OFF \
+  -DINSTALL_LAYOUT=STANDALONE \
+  -DINSTALL_MYSQLDATADIR_STANDALONE=${dbdir} \
+  -DINSTALL_UNIX_ADDRDIR_STANDALONE=${TMPSRV}/mysql.sock \
+  -DINSTALL_SYSCONFDIR=${PREFIX}/${name}/conf \
+  -DINSTALL_SYSCONF2DIR=${PREFIX}/${name}/conf/my.cnf.d \
   -DINSTALL_SBINDIR=libexec \
   -DINSTALL_PLUGINDIR=lib/mysql/plugin \
   -DMYSQL_DATADIR=${dbdir} \
