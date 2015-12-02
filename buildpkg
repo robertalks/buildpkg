@@ -556,6 +556,23 @@ apply_patch()
  fi
 }
 
+# enable and use ccache
+enable_ccache()
+{
+ local cache_dir="$CWD/.ccache"
+
+ if [ -x /usr/bin/ccache ]; then
+    [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg error "failed to create $cache_dir directory."; exit 1; }
+    export CCACHE_DIR="$cache_dir"
+    export CCACHE_PATH="/usr/bin"
+    export PATH="/usr/lib/ccache/bin:$PATH"
+    /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
+ else
+    msg warn "ccache not available, please install it and try again."
+    sleep 1
+ fi
+}
+
 # run configure for package
 do_configure()
 {
@@ -569,6 +586,10 @@ do_configure()
  [ -d "$logdir" ] || mkdir -p $logdir
  [ -e "$logfile" ] && rm -f $logfile || :
  [ -z "$location" ] && location="${PREFIX}/${name}"
+
+ if [ $ccacheon -eq 1 ]; then
+    enable_ccache
+ fi
 
  msg info "Running $ARCH architecture, using compiler flags:"
  msg info " -- CFLAGS: $CFLAGS"
@@ -656,6 +677,8 @@ run_make()
  local cmd=""
  local old_path="$PATH"
 
+ start_counter="$(date +%s)"
+
  [ -d ${logdir} ] || mkdir -p ${logdir}
  [ -e ${logfile} ] && rm -f ${logfile} || :
 
@@ -666,37 +689,17 @@ run_make()
    SCONS_OPT="${SCONS_OPT} --32"
  fi
 
- start_counter="$(date +%s)"
  if [ "${name}" = "mongodb" ]; then
     export CPPFLAGS="$CFLAGS"
-    msg info "Running $ARCH architecture, without compiler flags."
-    msg info "Compiling ${name} source (scons -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name})"
-    msg info "Logfile saved in ${logfile}"
-    scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name} >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+    cmd="scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name}"
  else 
     cmd="make -j${MAKEJOBS}"
-
-    if [ $ccacheon -eq 1 ]; then
-       if [ -x /usr/bin/ccache ]; then
-          [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg error "failed to create $cache_dir directory."; exit 1; }
-          export CCACHE_DIR="$cache_dir"
-          export CCACHE_PATH="/usr/bin"
-          export PATH="/usr/lib/ccache/bin:$PATH"
-          /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
-          cmd="ccache $cmd"
-          msg info "ccache enabled, this will speed up the build."
-       else
-          msg warn "ccache not available, please install it and try again."
-          sleep 1
-       fi
-    fi
-
-    msg info "Compiling ${name} source ($cmd)"
-    msg info "Logfile saved in ${logfile}"
-    $cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
-
-    export PATH="$old_path"
  fi
+
+ msg info "Compiling ${name} source ($cmd)"
+ msg info "Logfile saved in ${logfile}"
+ $cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
+
  elapsed_time ${name}
 }
 
