@@ -566,8 +566,6 @@ enable_ccache()
     export CCACHE_DIR="$cache_dir"
     export CCACHE_PATH="/usr/bin"
     export PATH="/usr/lib/ccache/bin:$PATH"
-    export CC="/usr/bin/ccache"
-    export GCC="/usr/bin/ccache"
     /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
  else
     msg warn "ccache not available, please install it and try again."
