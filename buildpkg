@@ -146,6 +146,7 @@ set_deps_and_vars()
  triggeroff=0
  installoff=0
  ccacheon=0
+ ccache_enable=0
 }
 
 # setup global variables
@@ -566,6 +567,7 @@ enable_ccache()
     export CCACHE_DIR="$cache_dir"
     export CCACHE_PATH="/usr/bin"
     export PATH="/usr/lib/ccache/bin:$PATH"
+    export ccache_enable=1
     /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
  else
     msg warn "ccache not available, please install it and try again."
@@ -691,8 +693,11 @@ run_make()
  if [ "${name}" = "mongodb" ]; then
     export CPPFLAGS="$CFLAGS"
     cmd="scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name}"
- else 
-    cmd="make -j${MAKEJOBS}"
+ else
+    if [ $ccache_enable -eq 1 ]; then
+       cmd="ccache"
+    fi
+    cmd="$cmd make -j${MAKEJOBS}"
  fi
 
  msg info "Compiling ${name} source ($cmd)"
