@@ -678,7 +678,8 @@ run_make()
     if [ $ccacheon -eq 1 ]; then
        if [ -x /usr/bin/ccache ]; then
           [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg warn "failed to create $cache_dir directory."; exit 1; }
-          ccache_opts="-M 10G -o cache_dir=$cache_dir"
+          export CCACHE_DIR="$cache_dir"
+          ccache_opts="-M 10G"
           cmd="ccache $ccache_opts $cmd"
           msg info "ccache enabled, this will speed up the build."
        else
