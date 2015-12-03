@@ -44,7 +44,6 @@ Usage: $NAME [options...]
     --list-all          list all installed packages.
     --check-all         check all installed packages for available updates.
     --update-all        update all installed packages which have updates available.
-    --use-ccache        enable ccache, will speed up the build (default: disabled).
     --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
     --dont-install      disable install, only build package from source.
     --template=templ    build specific template.
@@ -145,8 +144,6 @@ set_deps_and_vars()
  buildall=0
  triggeroff=0
  installoff=0
- ccacheon=0
- ccache_enable=0
 }
 
 # setup global variables
@@ -557,24 +554,6 @@ apply_patch()
  fi
 }
 
-# enable and use ccache
-enable_ccache()
-{
- local cache_dir="$CWD/.ccache"
-
- if [ -x /usr/bin/ccache ]; then
-    [ -d "$cache_dir" ] || mkdir -p $cache_dir || { msg error "failed to create $cache_dir directory."; exit 1; }
-    export CCACHE_DIR="$cache_dir"
-    export CCACHE_PATH="/usr/bin"
-    export PATH="/usr/lib/ccache/bin:$PATH"
-    export ccache_enable=1
-    /usr/bin/ccache -M 10G >/dev/null 2>&1 || { msg error "failed to set ccache options."; exit 1; }
- else
-    msg warn "ccache not available, please install it and try again."
-    sleep 1
- fi
-}
-
 # run configure for package
 do_configure()
 {
@@ -588,11 +567,6 @@ do_configure()
  [ -d "$logdir" ] || mkdir -p $logdir
  [ -e "$logfile" ] && rm -f $logfile || :
  [ -z "$location" ] && location="${PREFIX}/${name}"
-
- if [ $ccacheon -eq 1 ]; then
-    msg info "ccache enabled, this will speed up the build."
-    enable_ccache
- fi
 
  msg info "Running $ARCH architecture, using compiler flags:"
  msg info " -- CFLAGS: $CFLAGS"
@@ -694,10 +668,7 @@ run_make()
     export CPPFLAGS="$CFLAGS"
     cmd="scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name}"
  else
-    if [ $ccache_enable -eq 1 ]; then
-       cmd="ccache"
-    fi
-    cmd="$cmd make -j${MAKEJOBS}"
+    cmd="make -j${MAKEJOBS}"
  fi
 
  msg info "Compiling ${name} source ($cmd)"
@@ -3176,10 +3147,6 @@ while [ $# -gt 0 ]; do
   --update-all)
      update_all
      exit 0
-  ;;
-
-  --use-ccache)
-     export ccacheon=1
   ;;
 
   --dont-trigger)
