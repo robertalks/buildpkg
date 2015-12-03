@@ -730,7 +730,7 @@ elapsed_time()
 
  end_counter="$(date +%s)"
  diff_timer="$((${end_counter} - ${start_counter}))"
- timer="$(date -u -d @${diff_timer} +'%-M minutes %-S seconds')"
+ timer="$(date -u -d @${diff_timer} +'%-M minutes, %-S seconds')"
  msg info "Build of ${name} took: ${timer}"
 }
 
