@@ -1285,7 +1285,7 @@ build_mongodb()
  fi
 
  if [[ "$PHP_VERSION" =~ 7.* ]]; then
-    msg error "mongo/php_mongo is not supported with php $PHP_VERSION"
+    msg error "mongo/php_mongo is not supported with PHP $PHP_VERSION"
     exit 1
  fi
 
@@ -1799,7 +1799,7 @@ build_php()
 
  if [ ${buildall} -eq 0 ]; then
     if [[ "$PHP_VERSION" =~ 7.* ]]; then
-       msg warn "php_mongo wont be rebuild, is not supported with php $PHP_VERSION"
+       msg warn "php_mongo wont be rebuild, is not supported with PHP $PHP_VERSION"
     else
        trigger php_mongo "${PREFIX}/php/modules"
     fi
@@ -1907,7 +1907,7 @@ build_php_mongo()
  fi
 
  if [[ "$PHP_VERSION" =~ 7.* ]]; then
-    msg error "mongo/php_mongo is not supported with php $PHP_VERSION"
+    msg error "mongo/php_mongo is not supported with PHP $PHP_VERSION"
     exit 1
  fi
 
