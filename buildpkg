@@ -1634,6 +1634,8 @@ build_php()
   --disable-cli \
   --disable-debug \
   --disable-static \
+  --disable-opcache \
+  --disable-opcache-file \
   --with-fpm-user=www \
   --with-fpm-group=www \
   --with-pic \
@@ -1662,7 +1664,6 @@ build_php()
   --enable-hash \
   --enable-session \
   --enable-exif=shared \
-  --enable-opcache \
   --enable-pcntl=shared \
   --enable-bcmath=shared \
   --enable-calendar=shared \
@@ -1714,15 +1715,6 @@ build_php()
           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
           -e "s|@@DATA@@|${DATA}/www|g" \
           ${PREFIX}/${name}/conf/${name}.ini >/dev/null 2>&1
-    fi
-
-    if [ ! -e ${PREFIX}/${name}/conf/modules.d/opcache.ini ]; then
-       msg info "Copying new configuration file for ${name} (opcache.ini) ..."
-       cp_as_root $CWD/config.d/opcache.ini ${PREFIX}/${name}/conf/modules.d/opcache.ini
-       [ -e ${PREFIX}/${name}/conf/modules.d/opcache.ini ] && \
-       $cmd sed -i \
-           -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-           ${PREFIX}/${name}/conf/modules.d/opcache.ini >/dev/null 2>&1
     fi
 
     if [ ! -e ${PREFIX}/${name}/conf/modules.d/modules.ini ]; then
