@@ -1778,6 +1778,10 @@ build_php()
        rm_as_root ${file}
     done
 
+    for file in /appls/php/modules/opcache.so /appls/php/conf/modules.d/opcache.ini; do
+        [ -e $file ] && rm_as_root $file
+    done
+
     start_service ${name}-fpm
 
     if ! $(update_pkg_version "$name" "$version"); then
