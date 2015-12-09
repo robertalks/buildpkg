@@ -1625,15 +1625,15 @@ build_php()
 
  do_configure ${name} \
  "--enable-inline-optimization \
+  --enable-cgi \
+  --enable-shared \
+  --enable-fpm \
   --disable-rpath \
   --without-pear \
   --without-gdbm \
-  --enable-cgi \
-  --enable-shared \
   --disable-cli \
   --disable-debug \
   --disable-static \
-  --enable-fpm \
   --with-fpm-user=www \
   --with-fpm-group=www \
   --with-pic \
@@ -1686,9 +1686,9 @@ build_php()
   --with-freetype-dir=/usr \
   --with-jpeg-dir=/usr \
   --with-mysql-sock=${TMPSRV}/mysql.sock \
-  --with-mysql=${PREFIX}/mysql \
   --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
-  --with-pdo-mysql=${PREFIX}/mysql"
+  --with-pdo-mysql=${PREFIX}/mysql \
+  --with-mysql=${PREFIX}/mysql"
 
  run_make ${name}
  run_install ${name}
