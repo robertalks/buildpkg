@@ -207,7 +207,7 @@ set_global_conf()
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
  DOVECOT_URL="http://dovecot.org/releases/2.2/dovecot-${DOVECOT_VERSION}.tar.gz"
  SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/release${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
- CLAMAV_URL="http://downloads.sourceforge.net/project/clamav/clamav/${CLAMAV_VERSION}/clamav-${CLAMAV_VERSION}.tar.gz"
+ CLAMAV_URL="http://www.clamav.net/downloads/production/clamav-${CLAMAV_VERSION}.tar.gz"
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
  PHPMYADMIN_URL="https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
