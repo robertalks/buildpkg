@@ -1284,6 +1284,11 @@ build_mongodb()
     cmd="sudo"
  fi
 
+ if [[ "$PHP_VERSION" =~ 7.* ]]; then
+    msg error "mongo/php_mongo is not supported with php $PHP_VERSION"
+    exit 1
+ fi
+
  [ -d build ] || mkdir -p build
  cd build
  [ -d ${dir} ] && rm -fr ${dir} || :
@@ -1793,7 +1798,11 @@ build_php()
  cd $CWD
 
  if [ ${buildall} -eq 0 ]; then
-    trigger php_mongo "${PREFIX}/php/modules"
+    if [[ "$PHP_VERSION" =~ 7.* ]]; then
+       msg warn "php_mongo wont be rebuild, is not supported with php $PHP_VERSION"
+    else
+       trigger php_mongo "${PREFIX}/php/modules"
+    fi
  fi
 }
 
@@ -1895,6 +1904,11 @@ build_php_mongo()
 
  if [ $ID -ne 0 ]; then
     cmd="sudo"
+ fi
+
+ if [[ "$PHP_VERSION" =~ 7.* ]]; then
+    msg error "mongo/php_mongo is not supported with php $PHP_VERSION"
+    exit 1
  fi
 
  # we need to make sure that php is installed.
