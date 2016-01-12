@@ -1232,11 +1232,13 @@ build_mysql()
 
     if [ ${db_install} -eq 0 ]; then
        if [ -x ${PREFIX}/${name}/bin/mysql_upgrade ]; then
+          MYSQL_UPGRADE_PASSWORD="$MYSQL_ROOT_PASSWORD"
+          [ -r "$CWD/.mysql_upgrade_passwd" ] && MYSQL_UPGRADE_PASSWORD="$(cat $CWD/.mysql_upgrade_passwd 2>/dev/null)"
           [ -e ${db_upgrade_log} ] && rm -f ${db_upgrade_log}
           msg info "Running mysql_upgrade (if version didnt change, this wont do anything)"
           msg info "Logfile saved in ${db_upgrade_log}"
           ${PREFIX}/${name}/bin/mysql_upgrade --force \
-             -u root -p${MYSQL_ROOT_PASSWORD} -h localhost > ${db_upgrade_log} 2>&1 || \
+             -u root -p${MYSQL_UPGRADE_PASSWORD} -h localhost > ${db_upgrade_log} 2>&1 || \
              msg warn "Failed to upgrade database or database is up to date."
        else
           msg error "Unable to find mysql_upgrade binary."
