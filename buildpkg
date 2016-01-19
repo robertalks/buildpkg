@@ -344,9 +344,10 @@ get_package()
 get_dependency()
 {
  local name="$1"
+ local local_deps="$2"
  local dlocal="${name}deps"
  local deps="${!dlocal}"
- local cmd="apt-get install --no-install-recommends -q -f -y ${deps}"
+ local cmd="apt-get install --no-install-recommends -q -f -y"
  local logdir="$CWD/log"
  local logfile="${logdir}/${name}-dependencies.log"
 
@@ -356,6 +357,12 @@ get_dependency()
  if [ $ID -ne 0 ]; then
     cmd="sudo ${cmd}"
  fi
+
+ if [ -n "${local_deps}" ]; then
+    deps="${deps} ${local_deps}"
+ fi
+
+ cmd="${cmd} ${deps}"
 
  msg info "Installing required dependencies for ${name}"
  msg info "Logfile saved in ${logfile}"
@@ -1620,6 +1627,8 @@ build_php()
  local dir="${name}-${version}"
  local url="${PHP_URL}"
  local wwwdir=${DATA}/www
+ local local_deps=
+ local fpm_systemd=
  local cmd=
 
  if [ $ID -ne 0 ]; then
@@ -1638,16 +1647,17 @@ build_php()
  chown_dir ${dir}
  cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- get_dependency ${name}
+ if is_systemd; then
+    local_deps="libsystemd-daemon-dev libsystemd-dev"
+    fpm_systemd="--with-fpm-systemd"
+ fi
+
+ get_dependency "${name}" "${local_deps}"
 
  export EXTENSION_DIR=${PREFIX}/${name}/modules
  export PEAR_INSTALLDIR=${PREFIX}/${name}/pear
  export PHP_MYSQLND_ENABLED=yes
  export PHP_MYSQLND_COMPRESSION_SUPPORT=yes
-
- if is_systemd; then
-    fpm_systemd="--with-fpm-systemd"
- fi
 
  do_configure ${name} \
  "--enable-inline-optimization \
