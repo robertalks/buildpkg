@@ -299,6 +299,21 @@ is_debian()
  fi
 }
 
+# check if the system uses systemd
+is_systemd()
+{
+ local systemd=0
+
+ if [ -x /bin/systemctl ]; then
+    systemd="$(readlink -f /sbin/init 2>/dev/null | grep -cw 'systemd' || true)"
+    if [ $systemd -gt 0 ]; then
+       return 0;
+    fi
+ fi
+
+ return 1;
+}
+
 # if we are normal user, check if sudo is installed
 # otherwise we can't really do anything
 is_sudo()
@@ -1630,11 +1645,15 @@ build_php()
  export PHP_MYSQLND_ENABLED=yes
  export PHP_MYSQLND_COMPRESSION_SUPPORT=yes
 
+ if is_systemd; then
+    fpm_systemd="--with-fpm-systemd"
+ fi
+
  do_configure ${name} \
  "--enable-inline-optimization \
   --enable-cgi \
   --enable-shared \
-  --enable-fpm \
+  --enable-fpm $fpm_systemd \
   --disable-rpath \
   --without-pear \
   --without-gdbm \
