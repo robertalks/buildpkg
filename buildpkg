@@ -18,7 +18,7 @@
 
 # Do not touch this variables, will break the whole script.
 NAME="$(basename $0)"
-VERSION="1.0.6"
+VERSION="1.1.0"
 CWD="$(pwd)"
 ID="$(id -u)"
 
@@ -101,13 +101,13 @@ set_deps_and_vars()
  fi
 
  # Do not modify this, this are the only supported applications.
- PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot spf clamav clamsmtp pam_mysql monit phpmyadmin awstats"
+ PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot clamav clamsmtp pam_mysql monit phpmyadmin awstats"
 
  # Do not modify this, array of what packages each template contains
  tmpl_lemp=("nginx" "mysql" "php")
 
  # NOTE: this will pull in mysql
- tmpl_mail=("postfix" "dovecot" "greyfix" "spf" "clamsmtp" "pam_mysql")
+ tmpl_mail=("postfix" "dovecot" "greyfix" "clamsmtp" "pam_mysql")
 
  # NOTE: this will pull in mysql, nginx
  tmpl_mongo=("mongodb" "php" "php_mongo")
@@ -133,7 +133,6 @@ set_deps_and_vars()
  postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
  greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
  dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev libkrb5-dev libcap-dev"
- spfdeps="perl libmail-sendmail-perl libsys-hostname-long-perl libmail-spf-perl"
  clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl \
  libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
  clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
@@ -189,7 +188,6 @@ set_global_conf()
  [ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$GREYFIX_VERSION" ] && { msg error "GREYFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$DOVECOT_VERSION" ] && { msg error "DOVECOT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$SPF_VERSION" ] && { msg error "SPF_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -206,7 +204,6 @@ set_global_conf()
  POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
  DOVECOT_URL="http://dovecot.org/releases/2.2/dovecot-${DOVECOT_VERSION}.tar.gz"
- SPF_URL="https://launchpad.net/postfix-policyd-spf-perl/trunk/release${SPF_VERSION}/+download/postfix-policyd-spf-perl-${SPF_VERSION}.tar.gz"
  CLAMAV_URL="http://www.clamav.net/downloads/production/clamav-${CLAMAV_VERSION}.tar.gz"
  CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
  PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
@@ -248,7 +245,6 @@ set_global_conf()
  POSTFIX_VERSION \
  GREYFIX_VERSION \
  DOVECOT_VERSION \
- SPF_VERSION \
  CLAMAV_VERSION \
  CLAMSMTP_VERSION \
  PAM_MYSQL_VERSION \
@@ -265,7 +261,6 @@ set_global_conf()
  POSTFIX_URL \
  GREYFIX_URL \
  DOVECOT_URL \
- SPF_URL \
  CLAMAV_URL \
  CLAMSMTP_URL \
  PAM_MYSQL_URL \
@@ -2631,45 +2626,6 @@ build_pam_mysql()
  cd $CWD
 }
 
-# build and install postfix-policyd-spf
-build_spf()
-{
- local name="postfix-policyd-spf-perl"
- local version="${SPF_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${SPF_URL}"
-
- if [ ${installoff} -eq 1 ]; then
-    msg warn "There is no install section for ${name}."
-    exit 1
- fi
-
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
-
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
-
- get_dependency ${name}
-
- mkdir_as_root ${PREFIX}/postfix/scripts
- msg info "Installing ${name} script in ${PREFIX}/postfix/scripts ..."
- cp_as_root postfix-policyd-spf-perl \
-   ${PREFIX}/postfix/scripts >/dev/null 2>&1
- chmod_as_root 0755 ${PREFIX}/postfix/scripts/postfix-policyd-spf-perl
-
- if ! $(update_pkg_version "spf" "$version" "${PREFIX}/postfix/scripts" ); then
-     msg error "Failed to update $name version file."
-     exit 1
- fi
-
- cd $CWD
-}
-
 # build and install phpmyadmin
 build_phpmyadmin()
 {
@@ -2911,8 +2867,6 @@ list_all()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
-    elif [ "$name" = "spf" ]; then
-       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
@@ -2971,8 +2925,6 @@ check_all()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
-    elif [ "$name" = "spf" ]; then
-       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
@@ -3015,8 +2967,6 @@ update_all()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
-    elif [ "$name" = "spf" ]; then
-       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
@@ -3054,8 +3004,6 @@ build_pkg()
        location="${PREFIX}/php/modules"
     elif [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
-    elif [ "$name" = "spf" ]; then
-       location="${PREFIX}/postfix/scripts"
     else
        location=""
     fi
