@@ -62,8 +62,6 @@ Usage: $NAME [options...]
        ${tmpl_lemp[*]}
     mail:
        ${tmpl_mail[*]}
-    mongo:
-       ${tmpl_mongo[*]}
     extra:
        ${tmpl_extra[*]}
 
@@ -101,7 +99,7 @@ set_deps_and_vars()
  fi
 
  # Do not modify this, this are the only supported applications.
- PACKAGES="mysql mongodb nginx fcgiwrap php php_mongo postfix greyfix dovecot clamav clamsmtp pam_mysql monit phpmyadmin awstats"
+ PACKAGES="mysql nginx fcgiwrap php postfix greyfix dovecot clamav clamsmtp pam_mysql monit phpmyadmin awstats"
 
  # Do not modify this, array of what packages each template contains
  tmpl_lemp=("nginx" "mysql" "php")
@@ -109,21 +107,11 @@ set_deps_and_vars()
  # NOTE: this will pull in mysql
  tmpl_mail=("postfix" "dovecot" "greyfix" "clamsmtp" "pam_mysql")
 
- # NOTE: this will pull in mysql, nginx
- tmpl_mongo=("mongodb" "php" "php_mongo")
-
  # NOTE: this will pull in mysql, nginx, php
  tmpl_extra=("monit" "phpmyadmin" "awstats")
 
  mysqldeps="build-essential cmake g++ intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
  libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev pkg-config"
- mongodbdeps="scons g++ intltool binutils libpcap-dev libpcre3-dev libboost-dev libboost-program-options-dev \
- libboost-filesystem-dev libboost-thread-dev libreadline-dev libssl-dev"
- if [[ "$distro_release" =~ 8.* ]]; then
-    mongodbdeps="$mongodbdeps libstdc++-4.9-dev"
- else
-    mongodbdeps="$mongodbdeps libstdc++6-4.7-dev"
- fi
  nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
  fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
  phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
@@ -178,12 +166,10 @@ set_global_conf()
  [ -z "$VDA_PATCH_VERSION" ] && VDA_PATCH_VERSION="v13-2.10.0"
 
  [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$MONGODB_VERSION" ] && { msg error "MONGODB_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$FCGIWRAP_VERSION" ] && { msg error "FCGIWRAP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$SPAWNFCGI_VERSION" ] && { msg error "SPAWNFCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$PHP_MONGO_VERSION" ] && { msg error "PHP_MONGO_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
  [ -z "$GREYFIX_VERSION" ] && { msg error "GREYFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
@@ -194,12 +180,10 @@ set_global_conf()
  [ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
  MYSQL_URL="https://downloads.mariadb.org/f/mariadb-${MYSQL_VERSION}/source/mariadb-${MYSQL_VERSION}.tar.gz"
- MONGODB_URL="http://downloads.mongodb.org/src/mongodb-src-r${MONGODB_VERSION}.tar.gz"
  NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
  FCGIWRAP_URL="https://github.com/gnosek/fcgiwrap/archive/master.tar.gz"
  SPAWNFCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWNFCGI_VERSION}.tar.gz"
  PHP_URL="http://php.net/distributions/php-${PHP_VERSION}.tar.bz2"
- PHP_MONGO_URL="http://pecl.php.net/get/mongo-${PHP_MONGO_VERSION}.tgz"
  MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
  POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
  GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
@@ -235,12 +219,10 @@ set_global_conf()
  # We need the proper versions of the applications which we want to build.
  export \
  MYSQL_VERSION \
- MONGODB_VERSION \
  NGINX_VERSION \
  FCGIWRAP_VERSION \
  SPAWNFCGI_VERSION \
  PHP_VERSION \
- PHP_MONGO_VERSION \
  MONIT_VERSION \
  POSTFIX_VERSION \
  GREYFIX_VERSION \
@@ -253,10 +235,8 @@ set_global_conf()
  AWSTATS_VERSION
  export \
  MYSQL_URL \
- MONGODB_URL \
  NGINX_URL \
  PHP_URL \
- PHP_MONGO_URL \
  MONIT_URL \
  POSTFIX_URL \
  GREYFIX_URL \
@@ -681,12 +661,7 @@ run_make()
    SCONS_OPT="${SCONS_OPT} --32"
  fi
 
- if [ "${name}" = "mongodb" ]; then
-    export CPPFLAGS="$CFLAGS"
-    cmd="scons all -j${MAKEJOBS} ${SCONS_OPT} --prefix=${PREFIX}/${name}"
- else
-    cmd="make -j${MAKEJOBS}"
- fi
+ cmd="make -j${MAKEJOBS}"
 
  msg info "Compiling ${name} source ($cmd)"
  msg info "Logfile saved in ${logfile}"
@@ -727,10 +702,6 @@ run_install()
            mail_owner="postfix" \
            setgid_group="postdrop" \
            manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
-    elif [ "${name}" = "mongodb" ]; then
-       msg info "Installing ${name} from compiled source (scons install ${SCONS_OPT} --prefix=${PREFIX}/${name})"
-       $cmd scons install \
-           ${SCONS_OPT} --prefix=${PREFIX}/${name} install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
     else
        msg info "Installing ${name} from compiled source (make install)"
        $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
@@ -1286,105 +1257,6 @@ build_mysql()
 
 }
 
-# build and install mongodb server
-build_mongodb()
-{
- local name="mongodb"
- local version="${MONGODB_VERSION}"
- local tarball="${name}-src-r${version}.tar.gz"
- local dir="${name}-src-r${version}"
- local url="${MONGODB_URL}"
- local mylogdir="${MYDB}/log/${name}"
- local logdir=$CWD/log
- local dbdir="${MYDB}/${name}"
- local cmd=
-
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
-
- if [[ "$PHP_VERSION" =~ 7.* ]]; then
-    msg error "mongo/php_mongo is not supported with PHP $PHP_VERSION"
-    exit 1
- fi
-
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
-
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/${name}_change-compiler-flags.patch.gz 1
- apply_patch $CWD/patches/${name}_rename-unixSocketPrefix-to-socketpath.patch.gz 1
- sed -i "s|/data/db/|${dbdir}|" src/mongo/db/pdfile.cpp
- chmod_as_root 0644 README
-
- get_dependency ${name}
-
- run_make ${name}
- run_install ${name}
-
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
-
-    [ -d ${PREFIX}/${name}/sbin ] || mkdir_as_root ${PREFIX}/${name}/sbin 0755
-    mv_as_root ${PREFIX}/${name}/bin/mongod ${PREFIX}/${name}/sbin/mongod
-
-    create_user mongodb 10109 "MondoDB Server" ${dbdir}
-
-    [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
-    chown_as_root mongodb mongodb ${dbdir}
-    [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
-    chown_as_root mongodb mongodb ${mylogdir}
-
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
-    if [ ! -e ${PREFIX}/${name}/conf/mongod.conf ]; then
-       msg info "Copying new configuration file for ${name} (mongod.conf) ..."
-       cp_as_root $CWD/config.d/mongod.conf ${PREFIX}/${name}/conf/mongod.conf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/mongod.conf ] && \
-       $cmd sed -i \
-          -e "s|@@MYDB@@|${MYDB}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/mongod.conf >/dev/null 2>&1
-    fi
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@MYDB@@|${MYDB}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
-
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
-
-    start_service ${name}
-
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
-
- cd $CWD
-}
-
 # build and install nginx
 build_nginx()
 {
@@ -1822,14 +1694,6 @@ build_php()
  fi
 
  cd $CWD
-
- if [ ${buildall} -eq 0 ]; then
-    if [[ "$PHP_VERSION" =~ 7.* ]]; then
-       msg warn "php_mongo wont be rebuild, is not supported with PHP $PHP_VERSION"
-    else
-       trigger php_mongo "${PREFIX}/php/modules"
-    fi
- fi
 }
 
 # build and install monit
@@ -1910,73 +1774,6 @@ build_monit()
     start_service ${name}
 
     if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
-
- cd $CWD
-}
-
-# build and install php_mongo
-build_php_mongo()
-{
- local name="mongo"
- local version="${PHP_MONGO_VERSION}"
- local tarball="${name}-${version}.tgz"
- local dir="${name}-${version}"
- local url="${PHP_MONGO_URL}"
- local cmd=
-
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
-
- if [[ "$PHP_VERSION" =~ 7.* ]]; then
-    msg error "mongo/php_mongo is not supported with PHP $PHP_VERSION"
-    exit 1
- fi
-
- # we need to make sure that php is installed.
- need_pkg ${name} php
-
- # we need to make sure that mongodb is installed.
- need_pkg ${name} mongodb
-
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
-
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
-
- export PATH="${PREFIX}/php/bin:$PATH"
- ${PREFIX}/php/bin/phpize >/dev/null 2>&1 || { msg error "Failed while running ${PREFIX}/php/bin/phpize."; exit 1; }
-
- 
- export CPPFLAGS="-I${PREFIX}/mongodb/include"
- export LDFLAGS="-L${PREFIX}/mongodb/lib${LIBSUFFIX}"
- do_configure ${name} "--enable-mongo"
-
- run_make ${name}
- run_install ${name}
-
- if [ ${installoff} -eq 0 ]; then
-    strip_file ${PREFIX}/php/modules/${name}.so
-
-    [ -d ${PREFIX}/php/conf/modules.d ] || mkdir_as_root ${PREFIX}/php/conf/modules.d
-    if [ ! -e ${PREFIX}/php/conf/modules.d/mongo.ini ]; then
-       msg info "Copying new configuration file for ${name} (${name}.ini) ..."
-       cp_as_root $CWD/config.d/mongo.ini ${PREFIX}/php/conf/modules.d/mongo.ini
-       chown_as_root root root ${PREFIX}/php/conf/modules.d
-    fi
-
-    stop_service php-fpm
-    start_service php-fpm
-
-    if ! $(update_pkg_version "php_mongo" "$version" "${PREFIX}/php/modules" ); then
         msg error "Failed to update $name version file."
         exit 1
     fi
@@ -2863,9 +2660,7 @@ list_all()
 
  pkg_count=0
  for name in ${PACKAGES}; do
-    if [ "$name" = "php_mongo" ]; then
-       location="${PREFIX}/php/modules"
-    elif [ "$name" = "pam_mysql" ]; then
+    if [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
     else
        location=""
@@ -2921,9 +2716,7 @@ check_all()
 
  pkg_count=0
  for name in ${PACKAGES}; do
-    if [ "$name" = "php_mongo" ]; then
-       location="${PREFIX}/php/modules"
-    elif [ "$name" = "pam_mysql" ]; then
+    if [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
     else
        location=""
@@ -2963,9 +2756,7 @@ update_all()
 
  pkg_count=0
  for name in ${PACKAGES}; do
-    if [ "$name" = "php_mongo" ]; then
-       location="${PREFIX}/php/modules"
-    elif [ "$name" = "pam_mysql" ]; then
+    if [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
     else
        location=""
@@ -3000,9 +2791,7 @@ build_pkg()
  local ver=""
 
  if [ -n "$name" ]; then
-    if [ "$name" = "php_mongo" ]; then
-       location="${PREFIX}/php/modules"
-    elif [ "$name" = "pam_mysql" ]; then
+    if [ "$name" = "pam_mysql" ]; then
        location="$PAM_MODULES_DIR"
     else
        location=""
@@ -3044,7 +2833,7 @@ build_template()
  local templ="$1"
 
  if [ -z "$templ" ]; then
-    msg error "You must specify a template (valid templates are: lemp, mail, mongo, extra)"
+    msg error "You must specify a template (valid templates are: lemp, mail, extra)"
     exit 1
  fi
 
@@ -3066,13 +2855,6 @@ build_template()
         done
     ;;
 
-    mongo)
-        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mongo[*]})"
-        for name in ${tmpl_mongo[@]}; do
-           build_pkg $name
-        done
-    ;;
-
     extra)
         msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_extra[*]})"
         for name in ${tmpl_extra[@]}; do
@@ -3081,7 +2863,7 @@ build_template()
     ;;
 
     *)
-       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, mongo, extra)"
+       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, extra)"
        exit 1
     ;;
 
