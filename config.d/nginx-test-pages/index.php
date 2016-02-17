@@ -1,8 +1,8 @@
 <html>
-<title>Test page</title>
+<title>mini-http-server - php test page</title>
 <body>
 <?php
- echo "<b>mini-http-server and PHP works!</b>";
+	echo "<div align=\"center\"><b>mini-http-server and PHP works!</b></div>";
 ?>
 </body>
 </html>

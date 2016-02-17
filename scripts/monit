@@ -16,67 +16,78 @@ ARGS="-c ${CONFIG} -s /var/run/monit/monit.state"
 NAME=monit
 DESC=monit
 
-PATH=${prefix}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-test -f ${DAEMON} || exit 0
+PATH=${prefix}/bin:/sbin:/bin:/usr/sbin:/usr/bin
+test -f ${DAEMON} || exit 1
 set -e
 
 . /lib/lsb/init-functions
 
 monit_check_config () {
-    # Check for emtpy config, probably default configfile.
-    if [ "`grep -s -v \"^#\" ${CONFIG}`" = "" ]; then
-        echo " empty config, please edit ${CONFIG}."
-        exit 0
-    fi
+	# Check for emtpy config, probably default configfile.
+	if [ "$(grep -s -v \"^#\" ${CONFIG})" == "" ]; then
+		log_failure_msg "empty config, please edit ${CONFIG}."
+		exit 1
+	fi
 }
 
 monit_checks () {
- monit_check_config
- [ -d /var/run/monit ] || mkdir -p -m 0750 /var/run/monit
- /bin/chmod go-rwx ${CONFIG}
- ${DAEMON} -t >/dev/null 2>&1
- if [ $? -ne 0 ]; then
-   log_failure_msg "error in ${CONFIG}, please check it and try again"
-   exit 1
- fi
+	monit_check_config
+	[ -d /var/run/monit ] || mkdir -p -m 0750 /var/run/monit
+	/bin/chmod go-rwx ${CONFIG}
+	${DAEMON} -t >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		log_failure_msg "error in ${CONFIG}, please check it and try again"
+		exit 1
+	fi
+}
+
+start_monit() {
+	log_daemon_msg "Starting monit" "$DESC"
+	monit_checks
+
+	if start-stop-daemon --start --quiet --pidfile /var/run/${NAME}.pid \
+			--exec ${DAEMON} > /dev/null 2>&1 -- $ARGS; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
+}
+
+stop_monit() {
+	log_daemon_msg "Stopping monit" "$DESC"
+	if start-stop-daemon --retry 5 --oknodo --stop --quiet --pidfile /var/run/${NAME}.pid \
+			--exec ${DAEMON}  > /dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
+	rm -f /var/run/monit/monit.state
 }
 
 case "$1" in
-  start)
-   log_daemon_msg "Starting monit" "$DESC"
-   monit_checks $1
-   start-stop-daemon --start --quiet --pidfile /var/run/${NAME}.pid \
-          --exec ${DAEMON} > /dev/null 2>&1 -- $ARGS
-   if [ $? -eq 0 ]; then
-      log_end_msg 0
-   else
-      log_end_msg 1
-   fi
-  ;;
-  stop)
-   log_daemon_msg "Stopping monit" "$DESC"
-   start-stop-daemon --retry 5 --oknodo --stop --quiet --pidfile /var/run/${NAME}.pid \
-          --exec ${DAEMON}  > /dev/null 2>&1
-   if [ $? -eq 0 ]; then
-      log_end_msg 0
-   else
-      log_end_msg 1
-   fi
-   rm -f /var/run/monit/monit.state
-  ;;
-  restart|force-reload)
-   $0 stop
-   sleep 3
-   $0 start
-  ;;
-  syntax)
-   monit_check_syntax
-  ;;
-  *)
-   N=/etc/init.d/${NAME}
-   echo "Usage: $N {start|stop|restart|force-reload|syntax}" >&2
-   exit 1
-  ;;
+	start)
+		start_monit
+	;;
+
+	stop)
+		stop_monit
+	;;
+
+	restart|force-reload)
+		stop_monit
+		sleep 2
+		start_monit
+	;;
+
+	syntax)
+		monit_check_syntax
+	;;
+
+	*)
+		N=/etc/init.d/${NAME}
+		echo "Usage: $N {start|stop|restart|force-reload|syntax}" >&2
+		exit 1
+	;;
 esac
 
 exit 0

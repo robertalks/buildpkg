@@ -12,148 +12,120 @@
 
 NAME=mysql
 basedir="@@PREFIX@@"
-confdir="@@PREFIX@@/conf"
 datadir="@@MYDB@@/mysql"
+mysqld_pid_file_path="@@MYDB@@/log/mysql/mysql.pid"
 service_startup_timeout=900
+
+if [ -z "${basedir}" ]; then
+	basedir="/appls/mysql"
+fi
+if [ -z "${datadir}" ]; then
+	datadir="/srv/databases/mysql"
+fi
+
+confdir="${basedir}/conf"
+bindir="${basedir}/bin"
+sbindir="${basedir}/sbin"
+libexecdir="${basedir}/libexec"
+datadir_set="${datadir}"
+
+PATH=${basedir}/bin:/sbin:/bin:/usr/sbin:/usr/bin
+test -x "${bindir}/mysqld_safe" || exit 1
+set -e
 
 . /lib/lsb/init-functions
 ulimit -n 2048
 
-mysqld_pid_file_path="@@MYDB@@/log/mysql/mysql.pid"
-if test -z "${basedir}"
-then
-  basedir="@@PREFIX@@"
-  confdir="@@PREFIX@@/conf"
-  bindir="@@PREFIX@@/bin"
-  if test -z "${datadir}"
-  then
-    datadir="@@MYDB@@/mysql"
-  fi
-  sbindir="@@PREFIX@@/bin"
-  libexecdir="@@PREFIX@@/libexec"
-else
-  bindir="/appls/mysql/bin"
-  if test -z "${datadir}"
-  then
-    datadir="/srv/databases/mysql"
-  fi
-  sbindir="${basedir}/sbin"
-  libexecdir="${basedir}/libexec"
-fi
+wait_for_pid()
+{
+	local verb="$1"
+	local pid="$2"
+	local pid_file_path="$3"
+	local i=0
+	local ok=0
+	local avoid_race_condition="by checking again"
 
-datadir_set=@@MYDB@@/mysql
-PATH=${basedir}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-set -e
+	while [ $i -ne $service_startup_timeout ]; do
+		case "$verb" in
+			'created')
+				# wait for a PID-file to pop into existence.
+				if [ -s "${pid_file_path}" ]; then
+					ok=1
+					break
+				fi
+			;;
+			'removed')
+				# wait for this PID-file to disappear
+				if [ ! -s "${pid_file_path}" ]; then
+					ok=1
+					break
+				fi
+			;;
 
-mode=$1
-[ $# -ge 1 ] && shift
-other_args="$*"
+			*)
+				echo "wait_for_pid () usage: wait_for_pid created|removed pid pid_file_path"
+				exit 1
+			;;
+		esac
 
-parse_server_arguments() {
-  for arg do
-    case "$arg" in
-      --basedir=*)  basedir=$(echo "$arg" | sed -e 's/^[^=]*=//')
-                    bindir="${basedir}/bin"
-		    if test -z "${datadir}_set"; then
-		      datadir="${basedir}/data"
-		    fi
-		    sbindir="${basedir}/sbin"
-		    libexecdir="${basedir}/libexec"
-        ;;
-      --datadir=*)  datadir=$(echo "$arg" | sed -e 's/^[^=]*=//')
-		    datadir_set=1
-	;;
-      --pid-file=*) mysqld_pid_file_path=$(echo "$arg" | sed -e 's/^[^=]*=//') ;;
-      --service-startup-timeout=*) service_startup_timeout=$(echo "$arg" | sed -e 's/^[^=]*=//') ;;
-    esac
-  done
-}
+		# if server isn't running, then pid-file will never be updated
+		if [ -n "$pid" ]; then
+			if kill -0 "$pid" 2>/dev/null; then
+				:  # the server still runs
+			else
+				# The server may have exited between the last pid-file check and now.
+				if [ -n "$avoid_race_condition" ]; then
+					avoid_race_condition=""
+					continue  # Check again.
+        			fi
+				# there's nothing that will affect the file.
+				log_failure_msg "The server quit without updating PID file (${pid_file_path})."
+				return 1  # not waiting any more.
+			fi
+		fi
+		i=$(($i + 1))
+		sleep 1
+	done
 
-wait_for_pid () {
-  verb="$1"           # created | removed
-  pid="$2"            # process ID of the program operating on the pid-file
-  pid_file_path="$3" # path to the PID file.
-
-  i=0
-  avoid_race_condition="by checking again"
-  while test $i -ne ${service_startup_timeout} ; do
-    case "$verb" in
-      'created')
-        # wait for a PID-file to pop into existence.
-        test -s "${pid_file_path}" && i='' && break
-        ;;
-      'removed')
-        # wait for this PID-file to disappear
-        test ! -s "${pid_file_path}" && i='' && break
-        ;;
-      *)
-        echo "wait_for_pid () usage: wait_for_pid created|removed pid pid_file_path"
-        exit 1
-        ;;
-    esac
-    # if server isn't running, then pid-file will never be updated
-    if test -n "$pid"; then
-      if kill -0 "$pid" 2>/dev/null; then
-        :  # the server still runs
-      else
-        # The server may have exited between the last pid-file check and now.
-        if test -n "$avoid_race_condition"; then
-          avoid_race_condition=""
-          continue  # Check again.
-        fi
-        # there's nothing that will affect the file.
-        log_failure_msg "The server quit without updating PID file (${pid_file_path})."
-        return 1  # not waiting any more.
-      fi
-    fi
-    i=$(expr $i + 1)
-    sleep 1
-  done
-  if test -z "$i" ; then
-    log_success_msg
-    return 0
-  else
-    log_failure_msg
-    return 1
-  fi
+	if [ $ok -eq 1 ]; then
+		log_success_msg
+		return 0
+	else
+		log_failure_msg
+		return 1
+	fi
 }
 
 # Get arguments from the my.cnf file,
 # the only group, which is read from now on is [mysqld]
-if test -x ./bin/my_print_defaults
-then
-  print_defaults="./bin/my_print_defaults"
-elif test -x ${bindir}/my_print_defaults
-then
-  print_defaults="${bindir}/my_print_defaults"
-elif test -x ${bindir}/mysql_print_defaults
-then
-  print_defaults="${bindir}/mysql_print_defaults"
+if [ -x "./bin/my_print_defaults" ]; then
+	print_defaults="./bin/my_print_defaults"
+elif [ -x "${bindir}/my_print_defaults" ]; then
+	print_defaults="${bindir}/my_print_defaults"
+elif [ -x "${bindir}/mysql_print_defaults" ]; then
+	print_defaults="${bindir}/mysql_print_defaults"
 else
-  # Try to find basedir in /etc/my.cnf
-  conf=${basedir}/conf/my.cnf
-  print_defaults=
-  if test -r ${conf}
-  then
-    subpat='^[^=]*basedir[^=]*=\(.*\)$'
-    dirs=$(sed -e "/$subpat/!d" -e 's//\1/' ${conf})
-    for d in $dirs
-    do
-      d=$(echo $d | sed -e 's/[ 	]//g')
-      if test -x "$d/bin/my_print_defaults"
-      then
-        print_defaults="$d/bin/my_print_defaults"
-        break
-      fi
-      if test -x "$d/bin/mysql_print_defaults"
-      then
-        print_defaults="$d/bin/mysql_print_defaults"
-        break
-      fi
-    done
-  fi
-  # Hope it's in the PATH ... but I doubt it
-  test -z "${print_defaults}" && print_defaults="my_print_defaults"
+	# Try to find basedir in /etc/my.cnf
+	conf="${basedir}/conf/my.cnf"
+	print_defaults=
+	if [ -r "${conf}" ]; then
+		subpat='^[^=]*basedir[^=]*=\(.*\)$'
+		dirs=$(sed -e "/$subpat/!d" -e 's//\1/' ${conf})
+		for d in $dirs; do
+			d=$(echo $d | sed -e 's/[ 	]//g')
+			if [ -x "$d/bin/my_print_defaults" ]; then
+				print_defaults="$d/bin/my_print_defaults"
+				break
+			elif [ -x "$d/bin/mysql_print_defaults" ]; then
+				print_defaults="$d/bin/mysql_print_defaults"
+				break
+			fi
+		done
+	fi
+	# Hope it's in the PATH ... but I doubt it
+        if [ -z "${print_defaults}" ]; then
+		print_defaults="my_print_defaults"
+	fi
 fi
 
 #
@@ -162,122 +134,119 @@ fi
 #
 
 extra_args=""
-if test -r "${confdir}/my.cnf"
-then
-  extra_args="-e ${confdir}/my.cnf"
-else
-  if test -r "/etc/my.cnf"
-  then
-    extra_args="-e /etc/my.cnf"
-  fi
+if [ -r "${confdir}/my.cnf" ]; then
+	extra_args="-e ${confdir}/my.cnf"
+elif [ -r "/etc/my.cnf" ]; then
+	extra_args="-e /etc/my.cnf"
 fi
-
-parse_server_arguments $(${print_defaults} ${extra_args} mysqld server mysql_server mysql.server)
 
 # Set pid file if not given
-if test -z "${mysqld_pid_file_path}"
-then
-  mysqld_pid_file_path="${datadir}/$(hostname).pid"
+if [ -z "${mysqld_pid_file_path}" ]; then
+	mysqld_pid_file_path="${datadir}/$(hostname).pid"
 else
-  case "${mysqld_pid_file_path}" in
-    /* ) ;;
-    * )  mysqld_pid_file_path="${datadir}/${mysqld_pid_file_path}" ;;
-  esac
+	case "${mysqld_pid_file_path}" in
+		/*)
+		;;
+		*)
+			mysqld_pid_file_path="${datadir}/${mysqld_pid_file_path}"
+		;;
+	esac
 fi
 
-case "${mode}" in
-  'start')
-    # Safeguard (relative paths, core dumps..)
-    cd ${basedir}
-    if test -s "${mysqld_pid_file_path}"
-    then
-      log_failure_msg "MariaDB/MySQL server seems to be running, or at least PID file exists and its not empty."
-      exit 1
-    else
-      log_daemon_msg "Starting MariaDB/MySQL server" "$NAME"
-      if test -x ${bindir}/mysqld_safe
-       then
-         # Give extra arguments to mysqld with the my.cnf file. This script
-         # may be overwritten at next upgrade.
-         ${bindir}/mysqld_safe --datadir="${datadir}" --pid-file="${mysqld_pid_file_path}" ${other_args} >/dev/null 2>&1 &
-         wait_for_pid created "$!" "${mysqld_pid_file_path}"; return_value=$?
-         exit $return_value
-      else
-         log_failure_msg "Couldn't find MariaDB/MySQL server (${bindir}/mysqld_safe)"
-      fi
-    fi
-    ;;
+case "$1" in
+	start)
+		# Safeguard (relative paths, core dumps..)
+		cd ${basedir}
+		if [ -s "${mysqld_pid_file_path}" ]; then
+			log_failure_msg "MariaDB/MySQL server seems to be running, or at least PID file exists and its not empty."
+			exit 1
+		else
+			log_daemon_msg "Starting MariaDB/MySQL server" "$NAME"
+			# Give extra arguments to mysqld with the my.cnf file. This script
+			# may be overwritten at next upgrade.
+			${bindir}/mysqld_safe --datadir="${datadir}" --pid-file="${mysqld_pid_file_path}" >/dev/null 2>&1 &
+			wait_for_pid created "$!" "${mysqld_pid_file_path}"
+			if [ $? -eq 0 ]; then
+				log_end_msg 0
+			else
+				log_end_msg 1
+			fi
+		fi
+	;;
 
-  'stop')
-    if test -s "${mysqld_pid_file_path}"
-    then
-      mysqld_pid=$(cat "${mysqld_pid_file_path}")
-      if (kill -0 ${mysqld_pid} 2>/dev/null)
-      then
-        log_daemon_msg "Stopping MariaDB/MySQL server" "$NAME"
-        kill ${mysqld_pid}
-        # mysqld should remove the pid file when it exits, so wait for it.
-        wait_for_pid removed "${mysqld_pid}" "${mysqld_pid_file_path}"; return_value=$?
-      else
-        log_failure_msg "MariaDB/MySQL server process #${mysqld_pid} is not running!"
-        rm "${mysqld_pid_file_path}"
-      fi
-      exit $return_value
-    else
-      log_failure_msg "MariaDB/MySQL server PID file could not be found!"
-    fi
-    ;;
+	stop)
+		if [ -s "${mysqld_pid_file_path}" ]; then
+			mysqld_pid=$(cat "${mysqld_pid_file_path}")
+			if (kill -0 ${mysqld_pid} 2>/dev/null); then
+				log_daemon_msg "Stopping MariaDB/MySQL server" "$NAME"
+				kill ${mysqld_pid} >/dev/null 2>&1
+				# mysqld should remove the pid file when it exits, so wait for it.
+				wait_for_pid removed "${mysqld_pid}" "${mysqld_pid_file_path}"
+			else
+				log_failure_msg "MariaDB/MySQL server process #${mysqld_pid} is not running!"
+				rm -f ${mysqld_pid_file_path}
+			fi
+		else
+			log_failure_msg "MariaDB/MySQL server PID file could not be found!"
+			exit 1
+		fi
+	;;
 
-  'restart')
-    if $0 stop  ${other_args}; then
-      $0 start ${other_args}
-    else
-      log_failure_msg "Failed to stop running server, so refusing to try to start."
-      exit 1
-    fi
-    ;;
+	restart)
+		if $0 stop; then
+			$0 start
+		else
+			log_failure_msg "Failed to stop running server, so refusing to try to start."
+			exit 1
+		fi
+	;;
 
-  'reload'|'force-reload')
-    if test -s "${mysqld_pid_file_path}" ; then
-      read mysqld_pid <  "${mysqld_pid_file_path}"
-      kill -HUP ${mysqld_pid} && log_success_msg "Reloading service MariaDB/MySQL"
-      touch "${mysqld_pid_file_path}"
-    else
-      log_failure_msg "MariaDB/MySQL PID file could not be found!"
-      exit 1
-    fi
-    ;;
+	reload|force-reload)
+		if [ -s "${mysqld_pid_file_path}" ]; then
+			read mysqld_pid < ${mysqld_pid_file_path}
+			kill -HUP ${mysqld_pid} >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				log_success_msg "Reloading service MariaDB/MySQL"
+				touch ${mysqld_pid_file_path}
+			else
+				log_failure_msg "Failed to reload running server."
+				exit 1
+			fi
+		else
+			log_failure_msg "MariaDB/MySQL PID file could not be found!"
+			exit 1
+		fi
+	;;
 
-  'status')
-    # First, check to see if pid file exists
-    if test -s "${mysqld_pid_file_path}" ; then
-      read mysqld_pid < "${mysqld_pid_file_path}"
-      if kill -0 ${mysqld_pid} 2>/dev/null ; then
-        log_success_msg "MariaDB/MySQL running (${mysqld_pid})"
-        exit 0
-      else
-        log_failure_msg "MariaDB/MySQL is not running, but PID file exists"
-        exit 1
-      fi
-    else
-      # Try to find appropriate mysqld process
-      mysqld_pid=$(pidof $libexecdir/mysqld)
-      if test -z ${mysqld_pid} ; then
-        log_failure_msg "MariaDB/MySQL is not running"
-        exit 3
-      else
-        log_failure_msg "MariaDB/MySQL is running but PID file could not be found"
-        exit 4
-      fi
-    fi
-    ;;
+	status)
+		# First, check to see if pid file exists
+		if [ -s "${mysqld_pid_file_path}" ]; then
+			read mysqld_pid < ${mysqld_pid_file_path}
+			if kill -0 ${mysqld_pid} 2>/dev/null ; then
+				log_success_msg "MariaDB/MySQL running (${mysqld_pid})"
+				exit 0
+			else
+				log_failure_msg "MariaDB/MySQL is not running, but PID file exists"
+				exit 1
+			fi
+		else
+			# Try to find appropriate mysqld process
+			mysqld_pid="$(pidof $libexecdir/mysqld 2>/dev/null)"
+			if [ -z ${mysqld_pid} ]; then
+				log_failure_msg "MariaDB/MySQL is not running"
+				exit 3
+			else
+				log_failure_msg "MariaDB/MySQL is running but PID file could not be found"
+				exit 4
+			fi
+		fi
+	;;
 
-    *)
-      # usage
-      N=/etc/init.d/$NAME
-      echo "Usage: $N  {start|stop|restart|reload|force-reload|status}"
-      exit 1
-    ;;
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N  {start|stop|restart|reload|force-reload|status}"
+		exit 1
+	;;
 esac
 
 exit 0

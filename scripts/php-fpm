@@ -10,19 +10,20 @@
 # Description:       starts the PHP FastCGI Process Manager daemon
 ### END INIT INFO
 
-prefix=@@PREFIX@@
-exec_prefix=${prefix}
-php_fpm_bin=${exec_prefix}/sbin/php-fpm
-php_fpm_conf=${exec_prefix}/conf/php-fpm.conf
-php_fpm_pid=/var/run/php-fpm.pid
+prefix="@@PREFIX@@"
+tmpsrv="@@TMPSRV@@"
+exec_prefix="${prefix}"
+php_fpm_bin="${exec_prefix}/sbin/php-fpm"
+php_fpm_conf="${exec_prefix}/conf/php-fpm.conf"
+php_fpm_pid="/var/run/php-fpm.pid"
 php_opts="--fpm-config ${php_fpm_conf}"
 user=www
 
 NAME=php-fpm
 DESC=php-fpm
 
-PATH=${exec_prefix}/sbin:${exec_prefix}/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-test -x ${php_fpm_bin} || exit 0
+PATH=${exec_prefix}/sbin:${exec_prefix}/bin:/sbin:/bin:/usr/sbin:/usr/bin
+test -x ${php_fpm_bin} || exit 1
 set -e
 
 . /lib/lsb/init-functions
@@ -30,139 +31,137 @@ ulimit -n 2048
 
 sanity()
 {
- mkdir -p @@TMPSRV@@/php/log >/dev/null 2>&1
- mkdir -p @@TMPSRV@@/php/sess >/dev/null 2>&1
- mkdir -p @@TMPSRV@@/php/tmp >/dev/null 2>&1
- chown ${user}.${user} -R @@TMPSRV@@/php >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php/log >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php/sess >/dev/null 2>&1
- chmod 0770 @@TMPSRV@@/php/tmp >/dev/null 2>&1
+	for dir in log sess tmp; do
+		mkdir -p -m 0770 "${tmpsrv}/php/$dir"
+	done
+	chmod 0770 "${tmpsrv}/php"
+	chown ${user}.${user} -R "${tmpsrv}/php" >/dev/null 2>&1
 }
 
-wait_for_pid () {
- try=0
- local mode=$1
- local file=$2
+ok=0
+wait_for_pid()
+{
+	local try=0
+	local mode="$1"
+	local file="$2"
 
- while test $try -lt 35 ; do
-   case "${mode}" in
-     create)
-      if [ -f "${file}" ] ; then
-         try=
-	 break
-      fi
-     ;;
+	while [ $try -lt 35 ]; do
+		case "${mode}" in
+			create)
+				if [ -f "${file}" ] ; then
+					ok=1
+					break
+				fi
+			;;
 
-     remove)
-      if [ ! -f "${file}" ] ; then
-         try=
-         break
-      fi
-     ;;
-   esac
-  try=$(expr $try + 1)
-  sleep 1
- done
+			remove)
+				if [ ! -f "${file}" ] ; then
+					ok=1
+					break
+				fi
+			;;
+		esac
+
+		try=$(($try + 1))
+		sleep 1
+	done
 }
 
 start_fpm()
 {
- log_daemon_msg "Starting PHP FastCGI Process Manager" "$DESC"
- sanity
- if [ -r ${php_fpm_pid} ] ; then
-    echo " warning, php-fpm is running. if not, remove the stale pid file."
-    exit 1
- else
-    $php_fpm_bin $php_opts
- fi
- if [ $? -ne 0 ] ; then
-    log_end_msg 1
-    exit 1
- else
-    log_end_msg 0
- fi
- wait_for_pid create ${php_fpm_pid}
- if [ -n "$try" ] ; then
-    log_end_msg 1
-    exit 1
- fi
+	log_daemon_msg "Starting PHP FastCGI Process Manager" "$DESC"
+	sanity
+	if [ -r ${php_fpm_pid} ] ; then
+		echo " warning, php-fpm is running. if not, remove the stale pid file."
+		exit 1
+	else
+		$php_fpm_bin $php_opts 2>/dev/null
+		wait_for_pid create ${php_fpm_pid}
+		if [ $ok -eq 0 ]; then
+			log_end_msg 1
+			exit 1
+		else
+			log_end_msg 1
+		fi
+	fi
 }
 
 stop_fpm()
 {
- log_daemon_msg "Stopping PHP FastCGI Process Manager" "$DESC"
- if [ ! -r ${php_fpm_pid} ] ; then
-    echo " warning, no pid file found - php-fpm is not running ?"
-    exit 1
- fi
- kill -QUIT $(cat ${php_fpm_pid})
- wait_for_pid remove ${php_fpm_pid}
- if [ -n "$try" ] ; then
-    log_end_msg 1
-    exit 1
- else
-    log_end_msg 0
- fi
+	log_daemon_msg "Stopping PHP FastCGI Process Manager" "$DESC"
+	if [ ! -r ${php_fpm_pid} ] ; then
+		echo " warning, no pid file found - php-fpm is not running ?"
+		exit 1
+	fi
+	kill -QUIT $(cat ${php_fpm_pid}) 2>/dev/null
+	wait_for_pid remove ${php_fpm_pid}
+	if [ $ok -eq 0 ]; then
+		log_end_msg 1
+		exit 1
+	else
+		log_end_msg 0
+	fi
 }
 
 quit_fpm()
 {
- log_daemon_msg "Terminating PHP FastCGI Process Manager" "$DESC"
- if [ ! -r ${php_fpm_pid} ] ; then
-    echo " warning, no pid file found - php-fpm is not running ?"
-    exit 1
- fi
- kill -TERM $(cat ${php_fpm_pid})
- wait_for_pid remove ${php_fpm_pid}
- if [ -n "$try" ] ; then
-    log_end_msg 1
-    exit 1
- fi
+	log_daemon_msg "Terminating PHP FastCGI Process Manager" "$DESC"
+	if [ ! -r ${php_fpm_pid} ] ; then
+		echo " warning, no pid file found - php-fpm is not running ?"
+		exit 1
+	fi
+	kill -TERM $(cat ${php_fpm_pid}) 2>/dev/null
+	wait_for_pid remove ${php_fpm_pid}
+	if [ $ok -eq 0 ]; then
+		log_end_msg 1
+		exit 1
+	else
+		log_end_msg 0
+	fi
 }
 
 reload_fpm()
 {
- log_daemon_msg "Reload PHP FastCGI Process Manager" "$DESC"
- if [ ! -r ${php_fpm_pid} ] ; then
-    echo " warning, no pid file found - php-fpm is not running ?"
-    exit 1
- fi
- kill -USR2 $(cat ${php_fpm_pid})
- if [ $? -eq 0 ]; then
-    log_end_msg 0
- else
-    log_end_msg 1
- fi
+	log_daemon_msg "Reload PHP FastCGI Process Manager" "$DESC"
+	if [ ! -r ${php_fpm_pid} ] ; then
+		echo " warning, no pid file found - php-fpm is not running ?"
+		exit 1
+	fi
+	kill -USR2 $(cat ${php_fpm_pid}) 2>/dev/null
+	if [ $? -eq 0 ]; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
 case "$1" in
-  start)
-   start_fpm
-  ;;
+	start)
+		start_fpm
+	;;
 
-  stop)
-   stop_fpm
-  ;;
+	stop)
+		stop_fpm
+	;;
 
-  force-quit)
-   quit_fpm
-  ;;
+	force-quit)
+		quit_fpm
+	;;
 
-  restart)
-   stop_fpm
-   sleep 3
-   start_fpm
-  ;;
+	restart)
+		stop_fpm
+		sleep 2
+		start_fpm
+	;;
 
-  reload)
-   reload_fpm
-  ;;
+	reload)
+		reload_fpm
+	;;
 
-  *)
-   echo "Usage: $NAME {start|stop|force-quit|restart|reload}"
-   exit 1
-  ;;
+	*)
+		echo "Usage: $NAME {start|stop|force-quit|restart|reload}"
+		exit 1
+	;;
 
 esac
 

@@ -13,78 +13,84 @@
 prefix=@@PREFIX@@
 DAEMON=${prefix}/sbin/clamsmtpd
 NAME=clamsmtp
+CUSER=clamav
 PIDFILE=/var/run/clamsmtp/$NAME.pid
 DAEMON_OPTS="-p ${PIDFILE}"
 
-PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-test -x $DAEMON || exit 0
+PATH=${prefix}/sbin:/sbin:/bin:/usr/sbin:/usr/bin
+test -x $DAEMON || exit 1
 set -e
 
 . /lib/lsb/init-functions
 
 sanity()
 {
- local user=clamav
- [ -d /var/run/clamsmtp ] || mkdir -m 0755 -p /var/run/clamsmtp
- chown ${user} /var/run/clamsmtp
+	if [ ! -d /var/run/clamsmtp ]; then
+		mkdir -m 0755 -p /var/run/clamsmtp
+	fi
+	chown $CUSER /var/run/clamsmtp
 }
 
 start_clamsmtp()
 {
- # do a sanity check first
- sanity
+	# do a sanity check first
+	sanity
 
- log_daemon_msg "Starting ClamSMTP" "$NAME"
- if start-stop-daemon --start --quiet --pidfile ${PIDFILE} \
-                --exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
-   log_end_msg 0
- else
-   log_end_msg 1
-fi
+	log_daemon_msg "Starting ClamSMTP" "$NAME"
+	if start-stop-daemon --start --quiet --pidfile ${PIDFILE} \
+			--exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
 stop_clamsmtp()
 {
- log_daemon_msg "Stopping ClamSMTP" "$NAME"
- if start-stop-daemon --stop --quiet --pidfile ${PIDFILE} \
-                --exec $DAEMON >/dev/null 2>&1; then
-   log_end_msg 0
- else
-   log_end_msg 1
- fi
+	log_daemon_msg "Stopping ClamSMTP" "$NAME"
+	if start-stop-daemon --stop --quiet --pidfile ${PIDFILE} \
+			--exec $DAEMON >/dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
 reload_clamsmtp()
 {
- log_daemon_msg "Reloading ClamSMTP configuration" "$NAME"
- if start-stop-daemon --stop --signal HUP --quiet --pidfile ${PIDFILE} \
-                --exec $DAEMON >/dev/null 2>&1; then
-   log_end_msg 0
- else
-   log_end_msg 1
- fi
+	log_daemon_msg "Reloading ClamSMTP configuration" "$NAME"
+	if start-stop-daemon --stop --signal HUP --quiet --pidfile ${PIDFILE} \
+			--exec $DAEMON >/dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
 case "$1" in
-  start)
-    start_clamsmtp
-  ;;
-  stop)
-    stop_clamsmtp
-  ;;
-  restart|force-reload)
-    stop_clamsmtp
-    sleep 3
-    start_clamsmtp
-  ;;
-  reload)
-    reload_clamsmtp
-  ;;
-  *)
-    N=/etc/init.d/$NAME
-    echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
-    exit 1
-  ;;
+	start)
+		start_clamsmtp
+	;;
+
+	stop)
+		stop_clamsmtp
+	;;
+
+	restart|force-reload)
+		stop_clamsmtp
+		sleep 2
+		start_clamsmtp
+	;;
+
+	reload)
+		reload_clamsmtp
+	;;
+
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
+		exit 1
+	;;
 esac
 
 exit 0

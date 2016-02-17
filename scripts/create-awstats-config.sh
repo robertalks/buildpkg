@@ -5,12 +5,12 @@
 
 NAME="$(basename $0)"
 DOMAIN="$1"
-DATA=@@DATA@@
-MODEL=@@PREFIX@@/conf/awstats.model.conf
-CONFIGDIR=@@PREFIX@@/conf
+DATA="@@DATA@@"
+MODEL="@@PREFIX@@/conf/awstats.model.conf"
+CONFIGDIR="@@PREFIX@@/conf"
 NEWCONFIG="${CONFIGDIR}/awstats.${DOMAIN}.conf"
-WWWUSER=www
-ID=$(id -u 2>/dev/null)
+WWWUSER="www"
+ID=$(id -u 2>/dev/null || echo 1)
 
 _info() { echo "$NAME: $@"; }
 _error() { echo "$NAME: error: $@" >&2; }
@@ -59,15 +59,15 @@ REGEX="$(echo ${DOMAIN}|sed 's/[.]/\\\\./g')"
 
 cp -af ${MODEL} ${NEWCONFIG}
 sed -i \
-  -e "s|^DNSLookup=.*|DNSLookup=1|" \
-  -e "s|^LogFile=.*|LogFile=/var/log/nginx/${DOMAIN}-access.log|" \
-  -e "s|^SiteDomain=.*|SiteDomain=\"${DOMAIN}\"|" \
-  -e "s|^DirData=.*|DirData=\"${DATA}\"|" \
-  -e "s|^HostAliases.*|HostAliases=\"localhost 127.0.0.1 REGEX[${REGEX}$]\"|g" \
-  -e "s|^AllowToUpdateStatsFromBrowser=.*|AllowToUpdateStatsFromBrowser=1|g" \
-  -e "s|^AllowFullYearView=.*|AllowFullYearView=3|g" \
-  -e "s|^EnableLockForUpdate=.*|EnableLockForUpdate=1|g" \
-  ${NEWCONFIG}
+	-e "s|^DNSLookup=.*|DNSLookup=1|" \
+	-e "s|^LogFile=.*|LogFile=/var/log/nginx/${DOMAIN}-access.log|" \
+	-e "s|^SiteDomain=.*|SiteDomain=\"${DOMAIN}\"|" \
+	-e "s|^DirData=.*|DirData=\"${DATA}\"|" \
+	-e "s|^HostAliases.*|HostAliases=\"localhost 127.0.0.1 REGEX[${REGEX}$]\"|g" \
+	-e "s|^AllowToUpdateStatsFromBrowser=.*|AllowToUpdateStatsFromBrowser=1|g" \
+	-e "s|^AllowFullYearView=.*|AllowFullYearView=3|g" \
+	-e "s|^EnableLockForUpdate=.*|EnableLockForUpdate=1|g" \
+	${NEWCONFIG}
 
 chmod 0644 ${NEWCONFIG} >/dev/null 2>&1
 

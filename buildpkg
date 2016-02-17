@@ -17,53 +17,57 @@
 #
 
 # Do not touch this variables, will break the whole script.
-NAME="$(basename $0)"
-VERSION="1.1.0"
+NAME="$(basename $0 2>/dev/null || echo buildpkg)"
+VERSION="1.2.0"
 CWD="$(pwd)"
-ID="$(id -u)"
+ID="$(id -u 2>/dev/null || echo 1)"
 
 if [ -t 1 ]; then
-  COL_RESET="\033[39;49;00m"
-  COL_RED="\033[31;01m"
-  COL_GREEN="\033[32;01m"
-  COL_YELLOW="\033[33;24m"
+	COL_RESET="\033[39;49;00m"
+	COL_RED="\033[31;01m"
+	COL_GREEN="\033[32;01m"
+	COL_YELLOW="\033[33;24m"
 fi
 
 # display usage
 usage()
 {
- cat << EOF
+	cat << EOF
 $NAME script $VERSION
 Report bugs at <robert@linux-source.org>
 
 Usage: $NAME [options...]
 
-  OPTIONS:
-    --help              display this message.
-    --pkg=package       build specific package.
-    --list-all          list all installed packages.
-    --check-all         check all installed packages for available updates.
-    --update-all        update all installed packages which have updates available.
-    --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
-    --dont-install      disable install, only build package from source.
-    --template=templ    build specific template.
-    --all               build all available packages.
+OPTIONS:
+        --help              display this message.
+        --pkg=package       build specific package.
+                            (NOTE: a package name must be specified with this option)
+        --list-all          list all installed packages.
+        --check-all         check all installed packages for available updates.
+        --update-all        update all installed packages which have updates available.
+        --dont-trigger      disable trigger (re)build of packages (use only with --pkg=package).
+                            (default: enabled)
+        --dont-install      disable install, only build package from source.
+                            (default: enabled)
+        --template=templ    build specific template.
+                            (available templates: lemp, mail, extra)
+        --all               build all available packages.
 
-  EXAMPLE:
-    $NAME --pkg=mysql (build mysql package)
+EXAMPLE:
+        $NAME --pkg=mysql (build mysql package)
       or
-    $NAME --all (build all packages available)
+        $NAME --all (build all packages available)
 
-  AVAILABLE PACKAGES:
-    ${PACKAGES}
+AVAILABLE PACKAGES:
+        ${PACKAGES}
 
-  AVAILABLE TEMPLATES:
-    lemp:
-       ${tmpl_lemp[*]}
-    mail:
-       ${tmpl_mail[*]}
-    extra:
-       ${tmpl_extra[*]}
+AVAILABLE TEMPLATES:
+      lemp:
+        ${tmpl_lemp[*]}
+      mail:
+        ${tmpl_mail[*]}
+      extra:
+        ${tmpl_extra[*]}
 
 EOF
 }
@@ -71,2440 +75,2441 @@ EOF
 # display info, warning or error message
 msg()
 {
- local level="$1"
- local message="$2"
+	local level="$1"
+	local message="$2"
 
- case "$level" in
-   warn)
-    echo -e "$NAME: ${COL_YELLOW}warn${COL_RESET}: $message" ;;
-   error)
-    echo -e "$NAME: ${COL_RED}error${COL_RESET}: $message" ;;
-   *)
-    echo -e "$NAME: ${COL_GREEN}info${COL_RESET}: $message" ;;
- esac
+	case "$level" in
+		warn)
+			echo -e "$NAME: ${COL_YELLOW}warn${COL_RESET}: $message" >&2
+		;;
+		error)
+			echo -e "$NAME: ${COL_RED}error${COL_RESET}: $message" >&2
+		;;
+		*)
+			echo -e "$NAME: ${COL_GREEN}info${COL_RESET}: $message"
+		;;
+	esac
 }
 
 # dependecies and global variables
-set_deps_and_vars()
+init()
 {
- local distro_release=""
+	local distro_release=""
 
- if [ -x /usr/bin/lsb_release ]; then
-    distro_release="$(/usr/bin/lsb_release -r -s 2>/dev/null)"
- elif [ -r /etc/debian_version ]; then
-    distro_release="$(cat /etc/debian_version 2>/dev/null)"
- else
-    msg error "unable to get version information, /etc/debian_version or /usr/bin/lsb_release are missing."
-    exit 1
- fi
+	if [ -x /usr/bin/lsb_release ]; then
+		distro_release="$(/usr/bin/lsb_release -r -s 2>/dev/null)"
+	elif [ -r /etc/debian_version ]; then
+		distro_release="$(cat /etc/debian_version 2>/dev/null)"
+	else
+		msg error "unable to get version information, /etc/debian_version or /usr/bin/lsb_release are missing."
+		exit 1
+	fi
 
- # Do not modify this, this are the only supported applications.
- PACKAGES="mysql nginx fcgiwrap php postfix greyfix dovecot clamav clamsmtp pam_mysql monit phpmyadmin awstats"
+	# Do not modify this, this are the only supported applications.
+	PACKAGES="mysql nginx fcgiwrap php postfix greyfix dovecot clamav clamsmtp pam_mysql monit phpmyadmin awstats"
 
- # Do not modify this, array of what packages each template contains
- tmpl_lemp=("nginx" "mysql" "php")
+	# Do not modify this, array of what packages each template contains
+	tmpl_lemp=("nginx" "mysql" "php")
 
- # NOTE: this will pull in mysql
- tmpl_mail=("postfix" "dovecot" "greyfix" "clamsmtp" "pam_mysql")
+	# NOTE: this will pull in mysql
+	tmpl_mail=("postfix" "dovecot" "greyfix" "clamsmtp" "pam_mysql")
 
- # NOTE: this will pull in mysql, nginx, php
- tmpl_extra=("monit" "phpmyadmin" "awstats")
+	# NOTE: this will pull in mysql, nginx, php
+	tmpl_extra=("monit" "phpmyadmin" "awstats")
 
- mysqldeps="build-essential cmake g++ intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
- libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev pkg-config"
- nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
- fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
- phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
- libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
- libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev libkrb5-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
- monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev automake autoconf libtool"
- postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
- greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
- dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev libkrb5-dev libcap-dev"
- clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl \
- libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
- clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
- pam_mysqldeps="libpam0g-dev"
- awstatsdeps="perl perl-modules"
+	mysqldeps="build-essential cmake g++ intltool flex bison libtool libreadline-dev libncurses5-dev libjemalloc-dev \
+libncursesw5-dev libbz2-dev zlib1g-dev libtool libaio-dev libssl-dev libevent-dev libxml2-dev libzmq-dev pkg-config"
+	nginxdeps="build-essential bzip2 libpcre3-dev libpcrecpp0 libssl-dev libbz2-dev zlib1g-dev intltool libperl-dev libaio-dev libcurl3-gnutls"
+	fcgiwrapdeps="libfcgi-dev automake autoconf pkg-config libtool"
+	phpdeps="build-essential libtool libmhash-dev libxml2-dev libltdl-dev libfontconfig1-dev libfreetype6-dev libgd2-noxpm-dev libmm-dev \
+libpng12-dev unixodbc-dev libsqlite3-dev libsqlite0-dev libxslt1-dev libdb-dev libcurl4-openssl-dev libcurl3 libbz2-dev libjpeg-dev \
+libc-client2007e-dev libevent-dev libexpat1-dev libxslt1-dev libkrb5-dev libmcrypt-dev libpspell-dev libpthread-stubs0-dev libsasl2-dev libtidy-dev re2c zlib1g-dev bzip2"
+	monitdeps="build-essential intltool libssl-dev libpam0g-dev libbz2-dev zlib1g-dev automake autoconf libtool"
+	postfixdeps="build-essential intltool libdb-dev libsasl2-dev libsqlite3-dev libbz2-dev zlib1g-dev libssl-dev libpcre3-dev"
+	greyfixdeps="build-essential intltool libdb-dev zlib1g-dev"
+	dovecotdeps="build-essential intltool libtool libdb-dev libsasl2-dev libsqlite3-dev pkg-config libbz2-dev zlib1g-dev libssl-dev libkrb5-dev libcap-dev"
+	clamavdeps="build-essential libgcc1 intltool libtool libltdl7 libmail-sendmail-perl libmilter-dev libmilter1.0.1 libsys-hostname-long-perl \
+libtommath-dev libtommath0 zlib1g-dev libbz2-dev"
+	clamsmtpdeps="build-essential libmail-sendmail-perl libsys-hostname-long-perl"
+	pam_mysqldeps="libpam0g-dev"
+	awstatsdeps="perl perl-modules"
 
- # building variables
- buildall=0
- triggeroff=0
- installoff=0
+	# building variables
+	buildall=0
+	triggeroff=0
+	installoff=0
 }
 
 # setup global variables
 set_global_conf()
 {
- local config_file=""
+	local config_file=""
 
- if [ -s "/etc/buildpkg.conf" ]; then
-    source /etc/buildpkg.conf
-    config_file="/etc/buildpkg.conf"
- elif [ -s "$CWD/buildpkg.conf" ]; then
-    source $CWD/buildpkg.conf
-    config_file="$CWD/buildpkg.conf"
- elif [ -s "~/.buildpkg.conf" ]; then
-    source ~/.buildpkg.conf
-    config_file="~/.buildpkg.conf"
- else
-    usage
-    msg error "unable to find configuration file."
-    msg error "looking for: /etc/$NAME.conf or $CWD/$NAME.conf or ~/.$NAME.conf"
-    exit 1
- fi
+	if [ -s "/etc/buildpkg.conf" ]; then
+		. /etc/buildpkg.conf
+		config_file="/etc/buildpkg.conf"
+	elif [ -s "$CWD/buildpkg.conf" ]; then
+		. $CWD/buildpkg.conf
+		config_file="$CWD/buildpkg.conf"
+	elif [ -s "~/.buildpkg.conf" ]; then
+		. ~/.buildpkg.conf
+		config_file="~/.buildpkg.conf"
+	else
+		usage
+		msg error "unable to find configuration file."
+		msg error "looking for: /etc/$NAME.conf or $CWD/$NAME.conf or ~/.$NAME.conf"
+		exit 1
+	fi
 
- # set global variables for deps and others
- set_deps_and_vars
+	# set global variables for deps and others
+	init
 
- [ -z "$PREFIX" ] && PREFIX=/appls
- [ -z "$DATA" ] && DATA=/srv
- [ -z "$MYDB" ] && MYDB=/srv/databases
- [ -z "$TMPSRV" ] && TMPSRV=/var/webservice
- [ -z "$HOST" ] && HOST="$(hostname -f)"
- [ -z "$MYSQL_ROOT_PASSWORD" ] && MYSQL_ROOT_PASSWORD="C00lCat"
- [ -z "$VDA_PATCH_VERSION" ] && VDA_PATCH_VERSION="v13-2.10.0"
+	[ -z "$PREFIX" ] && PREFIX=/appls
+	[ -z "$DATA" ] && DATA=/srv
+	[ -z "$MYDB" ] && MYDB=/srv/databases
+	[ -z "$TMPSRV" ] && TMPSRV=/var/webservice
+	[ -z "$HOST" ] && HOST="$(hostname -f)"
+	[ -z "$MYSQL_ROOT_PASSWORD" ] && MYSQL_ROOT_PASSWORD="C00lCat"
+	[ -z "$VDA_PATCH_VERSION" ] && VDA_PATCH_VERSION="v13-2.10.0"
 
- [ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$FCGIWRAP_VERSION" ] && { msg error "FCGIWRAP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$SPAWNFCGI_VERSION" ] && { msg error "SPAWNFCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$GREYFIX_VERSION" ] && { msg error "GREYFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$DOVECOT_VERSION" ] && { msg error "DOVECOT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
- [ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$MYSQL_VERSION" ] && { msg error "MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$NGINX_VERSION" ] && { msg error "NGINX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$FCGIWRAP_VERSION" ] && { msg error "FCGIWRAP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$SPAWNFCGI_VERSION" ] && { msg error "SPAWNFCGI_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$PHP_VERSION" ] && { msg error "PHP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$MONIT_VERSION" ] && { msg error "MONIT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$POSTFIX_VERSION" ] && { msg error "POSTFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$GREYFIX_VERSION" ] && { msg error "GREYFIX_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$DOVECOT_VERSION" ] && { msg error "DOVECOT_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$CLAMAV_VERSION" ] && { msg error "CLAMAV_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$CLAMSMTP_VERSION" ] && { msg error "CLAMSMTP_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$PAM_MYSQL_VERSION" ] && { msg error "PAM_MYSQL_VERSION cant be empty. Please set value in $config_file."; exit 1; }
+	[ -z "$AWSTATS_VERSION" ] && { msg error "AWSTATS_VERSION cant be empty. Please set value in $config_file."; exit 1; }
 
- MYSQL_URL="https://downloads.mariadb.org/f/mariadb-${MYSQL_VERSION}/source/mariadb-${MYSQL_VERSION}.tar.gz"
- NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
- FCGIWRAP_URL="https://github.com/gnosek/fcgiwrap/archive/master.tar.gz"
- SPAWNFCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWNFCGI_VERSION}.tar.gz"
- PHP_URL="http://php.net/distributions/php-${PHP_VERSION}.tar.bz2"
- MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
- POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
- GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
- DOVECOT_URL="http://dovecot.org/releases/2.2/dovecot-${DOVECOT_VERSION}.tar.gz"
- CLAMAV_URL="http://www.clamav.net/downloads/production/clamav-${CLAMAV_VERSION}.tar.gz"
- CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
- PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
- PHPMYADMIN_URL="https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
- AWSTATS_URL="http://prdownloads.sourceforge.net/awstats/awstats-${AWSTATS_VERSION}.tar.gz"
+	MYSQL_URL="https://downloads.mariadb.org/f/mariadb-${MYSQL_VERSION}/source/mariadb-${MYSQL_VERSION}.tar.gz"
+	NGINX_URL="http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz"
+	FCGIWRAP_URL="https://github.com/gnosek/fcgiwrap/archive/master.tar.gz"
+	SPAWNFCGI_URL="http://www.lighttpd.net/download/spawn-fcgi-${SPAWNFCGI_VERSION}.tar.gz"
+	PHP_URL="http://php.net/distributions/php-${PHP_VERSION}.tar.bz2"
+	MONIT_URL="http://www.mmonit.com/monit/dist/monit-${MONIT_VERSION}.tar.gz"
+	POSTFIX_URL="ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-${POSTFIX_VERSION}.tar.gz"
+	GREYFIX_URL="http://www.kim-minh.com/pub/greyfix/greyfix-${GREYFIX_VERSION}.tar.gz"
+	DOVECOT_URL="http://dovecot.org/releases/2.2/dovecot-${DOVECOT_VERSION}.tar.gz"
+	CLAMAV_URL="http://www.clamav.net/downloads/production/clamav-${CLAMAV_VERSION}.tar.gz"
+	CLAMSMTP_URL="http://thewalter.net/stef/software/clamsmtp/clamsmtp-${CLAMSMTP_VERSION}.tar.gz"
+	PAM_MYSQL_URL="http://downloads.sourceforge.net/project/pam-mysql/pam-mysql/${PAM_MYSQL_VERSION}/pam_mysql-${PAM_MYSQL_VERSION}.tar.gz"
+	PHPMYADMIN_URL="https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.tar.gz"
+	AWSTATS_URL="http://prdownloads.sourceforge.net/awstats/awstats-${AWSTATS_VERSION}.tar.gz"
 
- if [[ -z "$MAKEJOBS" ]] || [[ $MAKEJOBS -eq 0 ]]; then
-    MAKEJOBS="$(grep -wc MHz /proc/cpuinfo 2>/dev/null)"
- fi
+	MAKEJOBS="${MAKEJOBS:-"$(grep -wc MHz /proc/cpuinfo 2>/dev/null)"}"
 
- if [ "$(uname -m)" = "x86_64" ]; then
-    ARCH="x86_64"
- else
-    ARCH="i386"
- fi
+	if [ "$(uname -m)" = "x86_64" ]; then
+		ARCH="x86_64"
+	else
+		ARCH="i386"
+	fi
 
- if [ -x /usr/bin/dpkg-architecture ]; then
-    TARGET="$(dpkg-architecture -qDEB_HOST_GNU_TYPE 2>/dev/null)"
- else
-    TARGET="$ARCH-linux-gnu"
- fi
+	if [ -x /usr/bin/dpkg-architecture ]; then
+		TARGET="$(dpkg-architecture -qDEB_HOST_GNU_TYPE 2>/dev/null)"
+	else
+		TARGET="$ARCH-linux-gnu"
+	fi
 
- # In some newer systems, pam modules are not in /lib/security, but some other place, lets find out.
- PAM_MODULES_DIR="$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)"
+	# In some newer systems, pam modules are not in /lib/security, but some other place, lets find out.
+	PAM_MODULES_DIR="$(find /lib /lib64 -name pam_env.so 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null)"
 
- export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD PAM_MODULES_DIR
+	export PREFIX DATA MYDB TMPSRV HOST TARGET ARCH MAKEJOBS MYSQL_ROOT_PASSWORD PAM_MODULES_DIR
 
- # This should not be touched.
- # We need the proper versions of the applications which we want to build.
- export \
- MYSQL_VERSION \
- NGINX_VERSION \
- FCGIWRAP_VERSION \
- SPAWNFCGI_VERSION \
- PHP_VERSION \
- MONIT_VERSION \
- POSTFIX_VERSION \
- GREYFIX_VERSION \
- DOVECOT_VERSION \
- CLAMAV_VERSION \
- CLAMSMTP_VERSION \
- PAM_MYSQL_VERSION \
- PHPMYADMIN_VERSION \
- VDA_PATCH_VERSION \
- AWSTATS_VERSION
- export \
- MYSQL_URL \
- NGINX_URL \
- PHP_URL \
- MONIT_URL \
- POSTFIX_URL \
- GREYFIX_URL \
- DOVECOT_URL \
- CLAMAV_URL \
- CLAMSMTP_URL \
- PAM_MYSQL_URL \
- PHPMYADMIN_URL \
- AWSTATS_URL
+	# This should not be touched.
+	# We need the proper versions of the applications which we want to build.
+	export \
+	MYSQL_VERSION \
+	NGINX_VERSION \
+	FCGIWRAP_VERSION \
+	SPAWNFCGI_VERSION \
+	PHP_VERSION \
+	MONIT_VERSION \
+	POSTFIX_VERSION \
+	GREYFIX_VERSION \
+	DOVECOT_VERSION \
+	CLAMAV_VERSION \
+	CLAMSMTP_VERSION \
+	PAM_MYSQL_VERSION \
+	PHPMYADMIN_VERSION \
+	VDA_PATCH_VERSION \
+	AWSTATS_VERSION
+
+	export \
+	MYSQL_URL \
+	NGINX_URL \
+	PHP_URL \
+	MONIT_URL \
+	POSTFIX_URL \
+	GREYFIX_URL \
+	DOVECOT_URL \
+	CLAMAV_URL \
+	CLAMSMTP_URL \
+	PAM_MYSQL_URL \
+	PHPMYADMIN_URL \
+	AWSTATS_URL
 }
 
 # generate random string, need it for phpmyadmin
 generate_random()
 {
- [ "$2" = "0" ] && CHAR="[:alnum:]" || CHAR="[:graph:]"
- cat /dev/urandom | tr -cd "$CHAR" | head -c ${1:-32}
- echo
+	[ "$2" = "0" ] && CHAR="[:alnum:]" || CHAR="[:graph:]"
+	cat /dev/urandom | tr -cd "$CHAR" | head -c ${1:-32}
+	echo
 }
 
 # check if we are running Debian or Ubuntu or some derivate.
 is_debian()
 {
- local distro=""
- local message="This script requires a Debian/Ubuntu based distribution to run."
+	local distro=""
+	local message="This script requires a Debian/Ubuntu based distribution to run."
 
- if [ -x /usr/bin/lsb_release ]; then
-   distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
-   if [ "$distro" != "Debian" -a "$distro" != "Ubuntu" ]; then
-      msg error "$message"
-      exit 1
-   fi
- elif [ ! -s /etc/debian_version ]; then
-   msg error "$message"
-   exit 1
- fi
+	if [ -x /usr/bin/lsb_release ]; then
+		distro="$(/usr/bin/lsb_release -i -s 2>/dev/null)"
+		if [ "$distro" != "Debian" -a "$distro" != "Ubuntu" ]; then
+			msg error "$message"
+			exit 1
+		fi
+	elif [ ! -s /etc/debian_version ]; then
+		msg error "$message"
+		exit 1
+	fi
 }
 
 # check if the system uses systemd
 is_systemd()
 {
- local systemd=0
+	local systemd=0
 
- if [ -x /bin/systemctl ]; then
-    systemd="$(readlink -f /sbin/init 2>/dev/null | grep -cw 'systemd' || true)"
-    if [ $systemd -gt 0 ]; then
-       return 0;
-    fi
- fi
+	if [ -x /bin/systemctl ]; then
+		systemd="$(readlink -f /sbin/init 2>/dev/null | grep -cw 'systemd' || true)"
+		if [ $systemd -gt 0 ]; then
+			return 0;
+		fi
+	fi
 
- return 1;
+	return 1;
 }
 
 # if we are normal user, check if sudo is installed
 # otherwise we can't really do anything
 is_sudo()
 {
- if [ $ID -ne 0 ]; then
-    if [ ! -x /usr/bin/sudo ]; then
-       msg error "sudo command not found, we are running as normal user, we cant go on."
-       msg error "Please install sudo as root and then try again, or run $NAME with root rights."
-       exit 1
-    fi
- fi
+	if [ $ID -ne 0 ]; then
+		if [ ! -x /usr/bin/sudo ]; then
+			msg error "sudo command not found, we are running as normal user, we cant go on."
+			msg error "Please install sudo as root and then try again, or run $NAME with root rights."
+			exit 1
+		fi
+	fi
 }
 
 # install missing package (using apt-get)
 get_package()
 {
- local args="$1"
- local cmd="apt-get install --no-install-recommends -qq -f -y ${args}"
+	local args="$1"
+	local cmd="apt-get install --no-install-recommends -qq -f -y ${args}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
- msg info "Installing missing package: ${args}"
- ${cmd} > /dev/null 2>&1 || { msg error "Failed to run command: ${cmd}"; exit 1; }
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
+	msg info "Installing missing package: ${args}"
+	${cmd} > /dev/null 2>&1 || { msg error "Failed to run command: ${cmd}"; exit 1; }
 }
 
 # resolve dependencies for packages (using apt-get)
 get_dependency()
 {
- local name="$1"
- local local_deps="$2"
- local dlocal="${name}deps"
- local deps="${!dlocal}"
- local cmd="apt-get install --no-install-recommends -q -f -y"
- local logdir="$CWD/log"
- local logfile="${logdir}/${name}-dependencies.log"
+	local name="$1"
+	local local_deps="$2"
+	local dlocal="${name}deps"
+	local deps="${!dlocal}"
+	local cmd="apt-get install --no-install-recommends -q -f -y"
+	local logdir="$CWD/log"
+	local logfile="${logdir}/${name}-dependencies.log"
 
- [ -d ${logdir} ] || mkdir -p ${logdir}
- [ -e ${logfile} ] && rm -f ${logfile} || :
+	[ -d ${logdir} ] || mkdir -p ${logdir}
+	[ -e ${logfile} ] && rm -f ${logfile} || :
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- if [ -n "${local_deps}" ]; then
-    deps="${deps} ${local_deps}"
- fi
+	if [ -n "${local_deps}" ]; then
+		deps="${deps} ${local_deps}"
+	fi
 
- cmd="${cmd} ${deps}"
+	cmd="${cmd} ${deps}"
 
- msg info "Installing required dependencies for ${name}"
- msg info "Logfile saved in ${logfile}"
- ${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
- sleep 1
+	msg info "Installing required dependencies for ${name}"
+	msg info "Logfile saved in ${logfile}"
+	${cmd} > ${logfile} 2>&1 || { msg error "Failed to install dependecies for ${name}"; exit 1; }
+	sleep 1
 }
 
 # do a version comparison
 version_check()
 {
- local old_version="$1"
- local new_version="$2"
+	local old_version="$1"
+	local new_version="$2"
 
- if [ "$old_version" = "$(echo -e "$old_version\n$new_version" | sort -V | head -n1)" ]; then
-    return 0
- else
-    return 1
- fi
+	if [ "$old_version" = "$(echo -e "$old_version\n$new_version" | sort -V | head -n1)" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 # get package version
 get_pkg_version()
 {
- local name="$1"
- local location="$2"
- local version="0"
+	local name="$1"
+	local location="$2"
+	local version="0"
 
- [ -z "$location" ] && location="$PREFIX/$name"
+	[ -z "$location" ] && location="$PREFIX/$name"
 
- if [ -r "$location/.$name-version" ]; then
-    version="$(cat $location/.$name-version 2>/dev/null || echo 0)"
- fi
+	if [ -r "$location/.$name-version" ]; then
+		version="$(cat $location/.$name-version 2>/dev/null || echo 0)"
+	fi
 
- echo $version
+	echo $version
 }
 
 # update package version
 update_pkg_version()
 {
- local name="$1"
- local version="$2"
- local location="$3"
+	local name="$1"
+	local version="$2"
+	local location="$3"
 
- [ -z "$name" ] && return 1
- [ -z "$version" ] && return 1
- [ -z "$location" ] && location="$PREFIX/$name"
+	[ -z "$name" ] && return 1
+	[ -z "$version" ] && return 1
+	[ -z "$location" ] && location="$PREFIX/$name"
 
- if [ -d "$location" ]; then
-    echo "$version" > "$location/.$name-version" 2>/dev/null
-    if [ $? -eq 0 ]; then
-       return 0
-    fi
- fi
+	if [ -d "$location" ]; then
+		echo "$version" > "$location/.$name-version" 2>/dev/null
+		if [ $? -eq 0 ]; then
+			return 0
+		fi
+	fi
 
- return 1
+	return 1
 }
 
 # check if package is installed
 is_pkg_installed()
 {
- local name="$1"
- local location="$2"
+	local name="$1"
+	local location="$2"
 
- [ -z "$name" ] && return 1
- [ -z "$location" ] && location="$PREFIX/$name"
+	[ -z "$name" ] && return 1
+	[ -z "$location" ] && location="$PREFIX/$name"
 
- if [ -d "$location" ]; then
-    if [ -r "$location/.$name-version" ]; then
-       return 0
-    fi
-    return 2
- fi
+	if [ -d "$location" ]; then
+		if [ -r "$location/.$name-version" ]; then
+			return 0
+		fi
+		return 2
+	fi
 
- return 1
+	return 1
 }
 
 # set build CFLAGS/CXXFLAGS flags
 set_cflags()
 {
- [ -z "$CFLAGS" ] && CFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer" 
- [ -z "$CXXFLAGS" ] && CXXFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
+	[ -z "$CFLAGS" ] && CFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer" 
+	[ -z "$CXXFLAGS" ] && CXXFLAGS="-O2 -fPIC -pipe -fomit-frame-pointer"
 
- if [ "$ARCH" = "x86_64" ]; then
-    CFLAGS="$CFLAGS -mtune=native -m64"
-    CXXFLAGS="$CXXFLAGS -mtune=native -m64"
-    LIBSUFFIX="64"
- else
-    CFLAGS="$CFLAGS -march=i686 -mtune=native"
-    CXXFLAGS="$CXXFLAGS -march=i686 -mtune=native"
-    LIBSUFFIX=""
- fi
+	if [ "$ARCH" = "x86_64" ]; then
+		CFLAGS="$CFLAGS -mtune=native -m64"
+		CXXFLAGS="$CXXFLAGS -mtune=native -m64"
+		LIBSUFFIX="64"
+	else
+		CFLAGS="$CFLAGS -march=i686 -mtune=native"
+		CXXFLAGS="$CXXFLAGS -march=i686 -mtune=native"
+		LIBSUFFIX=""
+	fi
 
- export CFLAGS CXXFLAGS LIBSUFFIX
+	export CFLAGS CXXFLAGS LIBSUFFIX
 }
 
 # download function using wget
 download()
 {
- local url="$1"
- local output="$2"
+	local url="$1"
+	local output="$2"
 
- if [ ! -x /usr/bin/wget ]; then
-    get_package wget
- fi
+	if [ ! -x /usr/bin/wget ]; then
+		get_package wget
+	fi
 
- /usr/bin/wget --max-redirect=10 --no-check-certificate --no-cookies -q "${url}" -O "${output}" >/dev/null 2>&1
- if [ $? -eq 0 ]; then
-    echo -e "${COL_GREEN}OK${COL_RESET}"
- else
-    echo -e "${COL_RED}Failed${COL_RESET}"
-    rm -f ${output} >/dev/null 2>&1
-    exit 1
- fi
+	/usr/bin/wget --max-redirect=10 --no-check-certificate --no-cookies -q "${url}" -O "${output}" >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		echo -e "${COL_GREEN}OK${COL_RESET}"
+	else
+		echo -e "${COL_RED}Failed${COL_RESET}"
+		rm -f ${output} >/dev/null 2>&1
+		exit 1
+	fi
 }
 
 # download package source
 get_pkg()
 {
- local url="$1"
- local src="$2"
- local srcdir="${CWD}/sources"
- local localpwd="$(pwd)"
+	local url="$1"
+	local src="$2"
+	local srcdir="${CWD}/sources"
+	local localpwd="$(pwd)"
 
- [ -d ${srcdir} ] || mkdir -p ${srcdir}
- cd ${srcdir}
+	[ -d ${srcdir} ] || mkdir -p ${srcdir}
+	cd ${srcdir}
 
- if [ ! -e ${src} ]; then
-    echo -en "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching source archive ${src}: "
-    download "${url}" "${src}"
- else
-    msg warn "Source archive ${src} already exists."
- fi
+	if [ ! -e ${src} ]; then
+		echo -en "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching source archive ${src}: "
+		download "${url}" "${src}"
+	else
+		msg warn "Source archive ${src} already exists."
+	fi
 
- cd ${localpwd}
+	cd ${localpwd}
 }
 
 # unpack package source
 unpack_source()
 {
- local tarname="$1"
- local srcdir="${CWD}/sources"
+	local tarname="$1"
+	local srcdir="${CWD}/sources"
 
- if [ ! -e ${srcdir}/${tarname} ]; then
-    msg error "${tarname}: not found."
- else
-    msg info "Unpacking ${srcdir}/${tarname} in $(pwd) ..."
-    tar -xf ${srcdir}/${tarname} >/dev/null 2>&1 || { msg error "Failed to unpack ${tarname}, make sure that the tarball is not broken."; exit 1; }
- fi
+	if [ ! -e ${srcdir}/${tarname} ]; then
+		msg error "${tarname}: not found."
+	else
+		msg info "Unpacking ${srcdir}/${tarname} in $(pwd) ..."
+		tar -xf ${srcdir}/${tarname} >/dev/null 2>&1 || { msg error "Failed to unpack ${tarname}, make sure that the tarball is not broken."; exit 1; }
+	fi
 }
 
 # download patch
 get_patch()
 {
- local url="$1"
- local patchname="$2"
- local patchdir="${CWD}/patches"
- local patchfile="${patchdir}/${patchname}"
- local localpwd="$(pwd)"
+	local url="$1"
+	local patchname="$2"
+	local patchdir="${CWD}/patches"
+	local patchfile="${patchdir}/${patchname}"
+	local localpwd="$(pwd)"
 
- [ -d ${patchdir} ] || mkdir -p ${patchdir}
- cd ${patchdir}
+	[ -d ${patchdir} ] || mkdir -p ${patchdir}
+	cd ${patchdir}
 
- url="${url}/${patchname}"
- if [ ! -e ${patchname} ]; then
-    echo -ne "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching patch file ${patchname}: "
-    download "${url}" "${patchname}"
- else
-    msg warn "Patch file ${patchname} already exists."
- fi
+	url="${url}/${patchname}"
+	if [ ! -e ${patchname} ]; then
+		echo -ne "$NAME: ${COL_GREEN}info${COL_RESET}: Fetching patch file ${patchname}: "
+		download "${url}" "${patchname}"
+	else
+		msg warn "Patch file ${patchname} already exists."
+	fi
 
- cd ${localpwd}
+	cd ${localpwd}
 }
 
 # apply patch
 apply_patch()
 {
- local patch_file="$1"
- local strip_level="$2"
- local logdir=$CWD/log
- local logfile=${logdir}/${name}-patches.log
- local cmd=
+	local patch_file="$1"
+	local strip_level="$2"
+	local logdir="$CWD/log"
+	local logfile="${logdir}/${name}-patches.log"
+	local cmd=""
 
- if [ ! -x /usr/bin/patch ]; then
-    get_package patch
- fi
+	if [ ! -x /usr/bin/patch ]; then
+		get_package patch
+	fi
 
- if [ -s "${patch_file}" ]; then
-    if [ $(file "${patch_file}" |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
-       cmd=cat
-    elif [ $(file "${patch_file}" |grep -qw gzip >/dev/null 2>&1; echo $?) -eq 0 ]; then
-       cmd=zcat
-    elif [ $(file "${patch_file}" |grep -qw bzip2 >/dev/null 2>&1; echo $?) -eq 0 ]; then
-       cmd=bzcat
-    else
-       msg warn "unable to determine patch file type."
-       msg warn "patch ${patch_file} not applied."
-    fi
-    if [ "$cmd" != "" ]; then
-       [ -d ${logdir} ] || mkdir -p ${logdir}
-       msg info "Applying patch ${patch_file} ..."
-       msg info "Logfile saved in ${logfile}"
-       echo "applying patch ${patch_file} ..." >> ${logfile}
-       $cmd ${patch_file} | patch -p${strip_level} >> ${logfile} 2>&1
-       if [ $? -ne 0 ]; then
-          msg error "unable to apply patch ${patch_file}."
-          exit $?
-       fi
-    fi
- else
-    msg warn "patch ${patch_file} not available or broken."
- fi
+	if [ -s "${patch_file}" ]; then
+		if [ $(file "${patch_file}" |grep -qw text >/dev/null 2>&1; echo $?) -eq 0 ]; then
+			cmd=cat
+		elif [ $(file "${patch_file}" |grep -qw gzip >/dev/null 2>&1; echo $?) -eq 0 ]; then
+			cmd=zcat
+		elif [ $(file "${patch_file}" |grep -qw bzip2 >/dev/null 2>&1; echo $?) -eq 0 ]; then
+			cmd=bzcat
+		else
+			msg warn "unable to determine patch file type."
+			msg warn "patch ${patch_file} not applied."
+		fi
+
+		if [ "$cmd" != "" ]; then
+			[ -d ${logdir} ] || mkdir -p ${logdir}
+			msg info "Applying patch ${patch_file} ..."
+			msg info "Logfile saved in ${logfile}"
+			echo "applying patch ${patch_file} ..." >> ${logfile}
+			$cmd ${patch_file} | patch -p${strip_level} >> ${logfile} 2>&1
+			if [ $? -ne 0 ]; then
+				msg error "unable to apply patch ${patch_file}."
+				exit 1
+			fi
+		fi
+	else
+		msg warn "patch ${patch_file} not available or broken."
+	fi
 }
 
 # run configure for package
 do_configure()
 {
- local name="$1"
- local args="$2"
- local location="$3"
- local cwd="$(pwd)"
- local logdir="$CWD/log"
- local logfile="${logdir}/${name}-configure.log"
+	local name="$1"
+	local args="$2"
+	local location="$3"
+	local cwd="$(pwd)"
+	local logdir="$CWD/log"
+	local logfile="${logdir}/${name}-configure.log"
 
- [ -d "$logdir" ] || mkdir -p $logdir
- [ -e "$logfile" ] && rm -f $logfile || :
- [ -z "$location" ] && location="${PREFIX}/${name}"
+	[ -d "$logdir" ] || mkdir -p $logdir
+	[ -e "$logfile" ] && rm -f $logfile || :
+	[ -z "$location" ] && location="${PREFIX}/${name}"
 
- msg info "Running $ARCH architecture, using compiler flags:"
- msg info " -- CFLAGS: $CFLAGS"
- msg info " -- CXXFLAGS: $CXXFLAGS"
+	msg info "Running $ARCH architecture, using compiler flags:"
+	msg info "--- CFLAGS: $CFLAGS"
+	msg info "--- CXXFLAGS: $CXXFLAGS"
 
- msg info "Configuring ${name} ..."
- msg info "Logfile saved in ${logfile}"
+	msg info "Configuring ${name} ..."
+	msg info "Logfile saved in ${logfile}"
 
- if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" -a "${name}" != "fcgiwrap" ]; then
-   ./configure \
-      --prefix="$location" \
-      --sysconfdir="$location/conf" \
-      --bindir="$location/bin" \
-      --sbindir="$location/sbin" \
-      --libdir="$location/lib${LIBSUFFIX}" \
-      --program-prefix="" \
-      --program-suffix="" \
-      --target="${TARGET}" \
-      --host="${TARGET}" \
-      --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- elif [ "${name}" = "nginx" ]; then
-   ./configure \
-      --prefix="$location" \
-      --conf-path="${PREFIX}/${name}/conf/nginx.conf" \
-      --sbin-path="${PREFIX}/${name}/sbin/${name}" \
-      --http-log-path="/var/log/${name}/access.log" \
-      --error-log-path="/var/log/${name}/error.log" \
-      --http-fastcgi-temp-path="${TMPSRV}/${name}/fastcgi" \
-      --http-client-body-temp-path="${TMPSRV}/${name}/client" \
-      --http-proxy-temp-path="${TMPSRV}/${name}/proxy" \
-      --http-scgi-temp-path="${TMPSRV}/${name}/scgi" \
-      --http-uwsgi-temp-path="${TMPSRV}/${name}/uwsgi" \
-      --pid-path="/var/run/${name}.pid" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- elif [ "${name}" = "fcgiwrap" ]; then
-   ./configure \
-      --prefix="$location" \
-      --program-prefix="" \
-      --program-suffix="" \
-      --target="${TARGET}" \
-      --host="${TARGET}" \
-      --build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- elif [ "${name}" = "mysql" ]; then
-   mkdir -p ${cwd}/build
-   cd ${cwd}/build
-   cmake \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$location" \
-    -DINSTALL_SYSCONFDIR="$location/conf" \
-    ${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- elif [ "${name}" = "postfix" ]; then
-   make makefiles \
-    DEBUG="" \
-    CCARGS=" \
-     -DNO_NIS \
-     -DDEF_CONFIG_DIR="\\"\"$location/conf\\"\"" \
-     -DDEF_COMMAND_DIR="\\"\"$location/bin\\"\"" \
-     -DDEF_DAEMON_DIR="\\"\"$location/libexec\\"\"" \
-     -DUSE_TLS \
-     -DUSE_SASL_AUTH \
-     -DHAS_SSL \
-     -DHAS_MYSQL \
-     -DUSE_CYRUS \
-     -DHAS_SQLITE \
-     -DUSE_CYRUS_SASL -I/usr/include/sasl \
-     -DHAS_MYSQL -I${PREFIX}/mysql/include/mysql \
-     -Wno-comments" \
-    AUXLIBS=" \
-     -L${PREFIX}/mysql/lib \
-     -Wl,-rpath ${PREFIX}/mysql/lib \
-     -lpcre \
-     -lsasl2 -lssl -lcrypto \
-     -lmysqlclient -lsqlite3 \
-     -lpthread -lz -lm -lrt -ldl -lresolv" \
-    OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
- fi
+	if [ "${name}" != "mysql" -a "${name}" != "nginx" -a "${name}" != "postfix" -a "${name}" != "fcgiwrap" ]; then
+		./configure \
+			--prefix="$location" \
+			--sysconfdir="$location/conf" \
+			--bindir="$location/bin" \
+			--sbindir="$location/sbin" \
+			--libdir="$location/lib${LIBSUFFIX}" \
+			--program-prefix="" \
+			--program-suffix="" \
+			--target="${TARGET}" \
+			--host="${TARGET}" \
+			--build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+	elif [ "${name}" = "nginx" ]; then
+		./configure \
+			--prefix="$location" \
+			--conf-path="${PREFIX}/${name}/conf/nginx.conf" \
+			--sbin-path="${PREFIX}/${name}/sbin/${name}" \
+			--http-log-path="/var/log/${name}/access.log" \
+			--error-log-path="/var/log/${name}/error.log" \
+			--http-fastcgi-temp-path="${TMPSRV}/${name}/fastcgi" \
+			--http-client-body-temp-path="${TMPSRV}/${name}/client" \
+			--http-proxy-temp-path="${TMPSRV}/${name}/proxy" \
+			--http-scgi-temp-path="${TMPSRV}/${name}/scgi" \
+			--http-uwsgi-temp-path="${TMPSRV}/${name}/uwsgi" \
+			--pid-path="/var/run/${name}.pid" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+	elif [ "${name}" = "fcgiwrap" ]; then
+		./configure \
+			--prefix="$location" \
+			--program-prefix="" \
+			--program-suffix="" \
+			--target="${TARGET}" \
+			--host="${TARGET}" \
+			--build="${TARGET}" ${args} > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+	elif [ "${name}" = "mysql" ]; then
+		mkdir -p ${cwd}/build
+		cd ${cwd}/build
+		cmake \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_INSTALL_PREFIX="$location" \
+			-DINSTALL_SYSCONFDIR="$location/conf" \
+			${args} .. > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+	elif [ "${name}" = "postfix" ]; then
+		make makefiles \
+			DEBUG="" \
+			CCARGS="-DNO_NIS \
+				-DDEF_CONFIG_DIR="\\"\"$location/conf\\"\"" \
+				-DDEF_COMMAND_DIR="\\"\"$location/bin\\"\"" \
+				-DDEF_DAEMON_DIR="\\"\"$location/libexec\\"\"" \
+				-DUSE_TLS \
+				-DUSE_SASL_AUTH \
+				-DHAS_SSL \
+				-DHAS_MYSQL \
+				-DUSE_CYRUS \
+				-DHAS_SQLITE \
+				-DUSE_CYRUS_SASL -I/usr/include/sasl \
+				-DHAS_MYSQL -I${PREFIX}/mysql/include/mysql \
+				-Wno-comments" \
+			AUXLIBS=" \
+				-L${PREFIX}/mysql/lib \
+				-Wl,-rpath ${PREFIX}/mysql/lib \
+				-lpcre -lsasl2 -lssl -lcrypto \
+				-lmysqlclient -lsqlite3 \
+				-lpthread -lz -lm -lrt -ldl -lresolv" \
+			OPT="${CFLAGS}" > ${logfile} 2>&1 || { msg error "Failed to configure ${name}."; exit 1; }
+	fi
 }
 
 # build package from source
 run_make()
 {
- local name="$1"
- local logdir="$CWD/log"
- local logfile="${logdir}/${name}-build.log"
- local cmd=""
+	local name="$1"
+	local logdir="$CWD/log"
+	local logfile="${logdir}/${name}-build.log"
+	local cmd=""
 
- start_counter="$(date +%s)"
+	start_counter="$(date +%s)"
 
- [ -d ${logdir} ] || mkdir -p ${logdir}
- [ -e ${logfile} ] && rm -f ${logfile} || :
+	[ -d ${logdir} ] || mkdir -p ${logdir}
+	[ -e ${logfile} ] && rm -f ${logfile} || :
 
- SCONS_OPT="--nostrip --disable-warnings-as-errors --full --ssl --release --use-system-pcre --use-system-boost --sharedclient"
- if [ "$ARCH" = "x86_64" ]; then
-   SCONS_OPT="${SCONS_OPT} --64"
- else
-   SCONS_OPT="${SCONS_OPT} --32"
- fi
+	cmd="make -j${MAKEJOBS}"
 
- cmd="make -j${MAKEJOBS}"
+	msg info "Compiling ${name} source ($cmd)"
+	msg info "Logfile saved in ${logfile}"
+	$cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
 
- msg info "Compiling ${name} source ($cmd)"
- msg info "Logfile saved in ${logfile}"
- $cmd >> ${logfile} 2>&1 || { msg error "Failed to build source."; exit 1; }
-
- elapsed_time ${name}
+	elapsed_time ${name}
 }
 
 # install package from build source
 run_install()
 {
- local name="$1"
- local logdir="$CWD/log"
- local logfile="${logdir}/${name}-install.log"
- local cmd=""
+	local name="$1"
+	local logdir="$CWD/log"
+	local logfile="${logdir}/${name}-install.log"
+	local cmd=""
 
- if [ ${installoff} -eq 0 ]; then
-    if [ $ID -ne 0 ]; then
-       cmd="sudo"
-    fi
+	if [ ${installoff} -eq 0 ]; then
+		if [ $ID -ne 0 ]; then
+			cmd="sudo"
+		fi
 
-    if [ "${name}" = "php" ]; then
-       stop_service ${name}-fpm
-    else
-       stop_service ${name}
-    fi
+		if [ "${name}" = "php" ]; then
+			stop_service ${name}-fpm
+		else
+			stop_service ${name}
+		fi
 
-    if [ "${name}" = "postfix" ]; then
-       msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
-       $cmd sh ./postfix-install -non-interactive \
-           install_root="${PREFIX}/${name}" \
-           config_directory="/conf" \
-           command_directory="/sbin" \
-           daemon_directory="/libexec" \
-           sample_directory="/sample" \
-           html_directory="/html" \
-           readme_directory="/doc" \
-           mail_owner="postfix" \
-           setgid_group="postdrop" \
-           manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
-    else
-       msg info "Installing ${name} from compiled source (make install)"
-       $cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
-    fi
+		if [ "${name}" = "postfix" ]; then
+			msg info "Installing ${name} from compiled source (sh ./postfix-install -non-interactive)"
+			$cmd sh ./postfix-install -non-interactive \
+				install_root="${PREFIX}/${name}" \
+				config_directory="/conf" \
+				command_directory="/sbin" \
+				daemon_directory="/libexec" \
+				sample_directory="/sample" \
+				html_directory="/html" \
+				readme_directory="/doc" \
+				mail_owner="postfix" \
+				setgid_group="postdrop" \
+				manpage_directory="/man" >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+		else
+			msg info "Installing ${name} from compiled source (make install)"
+			$cmd make install >> ${logfile} 2>&1 || { msg error "Failed to install binary."; exit 1; }
+		fi
 
- else
-    msg warn "Package installation disabled from the command-line."
- fi 
+	else
+		msg warn "Package installation disabled from the command-line."
+	fi 
 }
 
 elapsed_time()
 {
- local name="$1"
+	local name="$1"
 
- end_counter="$(date +%s)"
- diff_timer="$((${end_counter} - ${start_counter}))"
- timer="$(date -u -d @${diff_timer} +'%-M minutes, %-S seconds')"
- msg info "Build of ${name} took: ${timer}"
+	end_counter="$(date +%s)"
+	diff_timer="$((${end_counter} - ${start_counter}))"
+	timer="$(date -u -d @${diff_timer} +'%-M minutes, %-S seconds')"
+	msg info "Build of ${name} took: ${timer}"
 }
 
 # change ownership to running user
 chown_dir()
 {
- local dir="$1"
- local whoami="$(whoami)"
+	local dir="$1"
+	local whoami="$(whoami)"
 
- chown ${whoami}.${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
+	chown ${whoami}.${whoami} -R ${dir} >/dev/null 2>&1 || msg error "Failed to change ownership on ${dir}."
 }
 
 # change ownership as root
 chown_as_root()
 {
- local user="$1"
- local group="$2"
- local src="$3"
- local cmd="chown ${user}.${group} ${src}"
+	local user="$1"
+	local group="$2"
+	local src="$3"
+	local cmd="chown ${user}.${group} ${src}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
- if [ $(file "${src}" |grep -qw directory >/dev/null 2>&1; echo $?) -eq 0 ]; then
-    cmd="${cmd} -R"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to change ownership on ${src} to ${user}.${group}."
+	if [ $(file "${src}" |grep -qo directory >/dev/null 2>&1; echo $?) -eq 0 ]; then
+		cmd="${cmd} -R"
+	fi
+
+	$cmd >/dev/null 2>&1 || msg error "Failed to change ownership on ${src} to ${user}.${group}."
 }
 
 # change rights as root
 chmod_as_root()
 {
- local mode="$1"
- local src="$2"
- local cmd="chmod ${mode} ${src}"
+	local mode="$1"
+	local src="$2"
+	local cmd="chmod ${mode} ${src}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to change rights on ${src}."
+	$cmd >/dev/null 2>&1 || msg error "Failed to change rights on ${src}."
 }
 
 # create directories as root
 mkdir_as_root()
 {
- local dir="$1"
- local mode="$2"
- local cmd=""
+	local dir="$1"
+	local mode="$2"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- $cmd mkdir -p ${dir} >/dev/null 2>&1 || msg error "Failed to create directory ${dir}."
+	$cmd mkdir -p ${dir} >/dev/null 2>&1 || msg error "Failed to create directory ${dir}."
 
- if [ -n "${mode}" ]; then
-    $cmd chmod ${mode} ${dir} >/dev/null 2>&1 || msg error "Failed to change rights on ${dir}."
- fi
+	if [ -n "${mode}" ]; then
+		$cmd chmod ${mode} ${dir} >/dev/null 2>&1 || msg error "Failed to change rights on ${dir}."
+	fi
 }
 
 # copy as root
 cp_as_root()
 {
- local src="$1"
- local dest="$2"
- local cmd="cp -f ${src} ${dest}"
+	local src="$1"
+	local dest="$2"
+	local cmd="cp -f ${src} ${dest}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to copy ${src} to ${dest}."
+	$cmd >/dev/null 2>&1 || msg error "Failed to copy ${src} to ${dest}."
 }
 
 # move as root
 mv_as_root()
 {
- local src="$1"
- local dest="$2"
- local cmd="mv ${src} ${dest}"
+	local src="$1"
+	local dest="$2"
+	local cmd="mv ${src} ${dest}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to move ${src} to ${dest}."
+	$cmd >/dev/null 2>&1 || msg error "Failed to move ${src} to ${dest}."
 }
 
 # delete as root
 rm_as_root()
 {
- local src="$1"
- local cmd="rm -fr ${src}"
+	local src="$1"
+	local cmd="rm -fr ${src}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to delete ${src}."
+	$cmd >/dev/null 2>&1 || msg error "Failed to delete ${src}."
 }
 
 # create link as root
 ln_as_root()
 {
- local src="$1"
- local dest="$2"
- local cmd="ln -sf ${src} ${dest}"
+	local src="$1"
+	local dest="$2"
+	local cmd="ln -sf ${src} ${dest}"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- $cmd >/dev/null 2>&1 || msg error "Failed to create link for ${src} to ${dest}."
+	$cmd >/dev/null 2>&1 || msg error "Failed to create link for ${src} to ${dest}."
 }
 
 # run ldconfig
 ldconfig()
 {
- local cmd="/sbin/ldconfig -r /"
+	local cmd="/sbin/ldconfig -r /"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
- 
- msg info "Running ldconfig -r / ..."
- $cmd >/dev/null 2>&1 || msg error "Failed to run ldconfig -r /"
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
+
+	msg info "Running ldconfig -r / ..."
+	$cmd >/dev/null 2>&1 || msg error "Failed to run ldconfig -r /"
 }
 
 # create ldconfig file for cache
 ld_add()
 {
- local content="$1"
- local name="$2"
- local cmd="sh -c"
+	local content="$1"
+	local name="$2"
+	local cmd="sh -c"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo ${cmd}"
- fi
- 
- [ -d /etc/ld.so.conf.d ] || mkdir_as_root /etc/ld.so.conf.d
+	if [ $ID -ne 0 ]; then
+		cmd="sudo ${cmd}"
+	fi
 
- if [ ! -e /etc/ld.so.conf.d/${name}.conf ]; then
-    $cmd "echo ${content} > /etc/ld.so.conf.d/${name}.conf" 2>/dev/null || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
- fi
+	[ -d /etc/ld.so.conf.d ] || mkdir_as_root /etc/ld.so.conf.d
+
+	if [ ! -e /etc/ld.so.conf.d/${name}.conf ]; then
+		$cmd "echo ${content} > /etc/ld.so.conf.d/${name}.conf" 2>/dev/null || msg error "Failed to created /etc/ld.so.conf.d/${name}.conf"
+	fi
 }
 
 # strip directory
 strip_dir()
 {
- local dir="$1"
- local cmd=""
+	local dir="$1"
+	local cmd=""
 
- if [ ${installoff} -eq 1 ]; then
-    return;
- fi
+	if [ ${installoff} -eq 1 ]; then
+		return;
+	fi
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- msg info "Stripping binaries in ${dir} ..."
- if [ -d ${dir} ]; then
-    $cmd find $dir | xargs file | grep -e "executable" -e "shared object" | grep ELF \
-           | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
- else
-    msg warn "Failed to strip ${dir} ..."
- fi
+	msg info "Stripping binaries in ${dir} ..."
+	if [ -d ${dir} ]; then
+		$cmd find $dir | xargs file | grep -e "executable" -e "shared object" | grep ELF \
+			| cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true
+	else
+		msg warn "Failed to strip ${dir} ..."
+	fi
 }
 
 # strip file
 strip_file()
 {
- local file="$1"
- local cmd=""
+	local file="$1"
+	local cmd=""
 
- if [ ${installoff} -eq 1 ]; then
-    return;
- fi
+	if [ ${installoff} -eq 1 ]; then
+		return;
+	fi
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- msg info "Stripping binary file ${file} ..."
- if [ -e ${file} ]; then
-    $cmd strip --strip-unneeded ${file} 2> /dev/null || true
- else
-    msg warn "Failed to strip ${file} ..."
- fi
+	msg info "Stripping binary file ${file} ..."
+	if [ -e ${file} ]; then
+		$cmd strip --strip-unneeded ${file} 2> /dev/null || true
+	else
+		msg warn "Failed to strip ${file} ..."
+	fi
 }
 
 # create user and group
 create_user()
 {
- # example: create_user www 10100 "Web User" /home/www
- local user="$1" # username
- local uid="$2"  # uniq id
- local geos="$3" # username geos
- local home="$4" # username home
- local cmd=""
+	# example: create_user www 10100 "Web User" /home/www
+	local user="$1" # username
+	local uid="$2"  # uniq id
+	local geos="$3" # username geos
+	local home="$4" # username home
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- if ! getent group ${user} >/dev/null 2>&1; then
-     msg info "Creating group ${user} ..."
-     ${cmd} groupadd -g ${uid} ${user} || { msg error "Failed to create group ${user}."; exit 1; }
- fi
- if ! getent passwd ${user} >/dev/null 2>&1; then
-     msg info "Creating user ${user} ..."
-     ${cmd} useradd -c "${geos}" -u ${uid} -l -g ${uid} -M -s /bin/false -d ${home} -r ${user} || { msg error "Failed to create user ${user}."; exit 1; }
- fi
+	if ! getent group ${user} >/dev/null 2>&1; then
+		msg info "Creating group ${user} ..."
+		${cmd} groupadd -g ${uid} ${user} || { msg error "Failed to create group ${user}."; exit 1; }
+	fi
 
- ${cmd} /usr/sbin/pwck -s 2>/dev/null || msg error "Failed to sort /etc/passwd."
- ${cmd} /usr/sbin/grpck -s 2>/dev/null || msg error "Failed to sort /etc/group."
+	if ! getent passwd ${user} >/dev/null 2>&1; then
+		msg info "Creating user ${user} ..."
+		${cmd} useradd -c "${geos}" -u ${uid} -l -g ${uid} -M -s /bin/false -d ${home} -r ${user} || { msg error "Failed to create user ${user}."; exit 1; }
+	fi
+
+	${cmd} /usr/sbin/pwck -s 2>/dev/null || msg error "Failed to sort /etc/passwd."
+	${cmd} /usr/sbin/grpck -s 2>/dev/null || msg error "Failed to sort /etc/group."
 }
 
 # trigger package (re)build.
 trigger()
 {
- local name="$1"
- local location="$2"
+	local name="$1"
+	local location="$2"
 
- if [ $triggeroff -eq 0 ]; then
-    if [ -n "${name}" ]; then
-       if $(is_pkg_installed $name $location); then
-          sleep 1
-          msg info "Triggered re-build of ${name} ..."
-          build_${name} 2>/dev/null || msg error "Failed to re-build ${name}."
-       fi
-    else
-       msg warn "Nothing triggered ..."
-    fi
- else
-    msg warn "Trigger is disabled, ${name} wont be re-build."
- fi
+	if [ $triggeroff -eq 0 ]; then
+		if [ -n "${name}" ]; then
+			if $(is_pkg_installed $name $location); then
+				sleep 1
+				msg info "Triggered re-build of ${name} ..."
+				build_${name} 2>/dev/null || msg error "Failed to re-build ${name}."
+			fi
+		else
+			msg warn "Nothing triggered ..."
+		fi
+	else
+		msg warn "Trigger is disabled, ${name} wont be re-build."
+	fi
 }
 
 # stop server/service
 stop_service()
 {
- local name="$1"
- local cmd=""
+	local name="$1"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- if [ -e /etc/init.d/${name} ]; then
-     msg info "Shutting down ${name} ..."
-     $cmd sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg warn "Failed to shutdown ${name}."
- else
-     msg warn "Initscript for ${name} not found."
- fi
+	if [ -e /etc/init.d/${name} ]; then
+		msg info "Shutting down ${name} ..."
+		$cmd sh /etc/init.d/${name} stop >/dev/null 2>&1 || msg warn "Failed to shutdown ${name}."
+	else
+		msg warn "Initscript for ${name} not found."
+	fi
 }
 
 # start server/service
 start_service()
 {
- local name="$1"
- local cmd=""
- local systemd_cmd="none"
+	local name="$1"
+	local cmd=""
+	local systemd_cmd="none"
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- if [ -x "/bin/systemctl" ]; then
-    systemd_cmd="/bin/systemctl"
- elif [ -x "/usr/bin/systemctl" ]; then
-    systemd_cmd="/usr/bin/systemctl"
- fi
+	if [ -x "/bin/systemctl" ]; then
+		systemd_cmd="/bin/systemctl"
+	elif [ -x "/usr/bin/systemctl" ]; then
+		systemd_cmd="/usr/bin/systemctl"
+	fi
 
- if [ "$systemd_cmd" == "none" ]; then
-    msg info "systemd not avaiable, skipping this part."
- else
-    msg info "Running $systemd_cmd daemon-reload ..."
-    $cmd $systemd_cmd daemon-reload >/dev/null 2>&1 || msg warn "Fail to reload systemd manager configuration"
- fi
+	if [ "$systemd_cmd" == "none" ]; then
+		msg info "systemd not avaiable, skipping this part."
+	else
+		msg info "Running $systemd_cmd daemon-reload ..."
+		$cmd $systemd_cmd daemon-reload >/dev/null 2>&1 || msg warn "Fail to reload systemd manager configuration"
+	fi
 
- if [ -e /etc/init.d/${name} ]; then
-     msg info "Starting up ${name} ..."
-     $cmd sh /etc/init.d/${name} start >/dev/null 2>&1 || msg warn "Failed to start ${name}."
- else
-     msg warn "Initscript for ${name} not found."
- fi
+	if [ -e /etc/init.d/${name} ]; then
+		msg info "Starting up ${name} ..."
+		$cmd sh /etc/init.d/${name} start >/dev/null 2>&1 || msg warn "Failed to start ${name}."
+	else
+		msg warn "Initscript for ${name} not found."
+	fi
 }
 
 # build missing package
 need_pkg()
 {
- local name="$1"
- local pkg="$2"
- local localall=$buildall
+	local name="$1"
+	local pkg="$2"
+	local localall=$buildall
 
- if ! $(is_pkg_installed $pkg); then
-    msg info "$name requires $pkg, building and installing $pkg."
-    build_$pkg
- fi
+	if ! $(is_pkg_installed $pkg); then
+		msg info "$name requires $pkg, building and installing $pkg."
+		build_$pkg
+	fi
 
- export buildall=$localall
+	export buildall=$localall
 }
 
 # build and install mysql server
 build_mysql()
 {
- local name="mysql"
- local version="${MYSQL_VERSION}"
- local tarball="mariadb-${version}.tar.gz"
- local dir="mariadb-${version}"
- local url="${MYSQL_URL}"
- local mylogdir="${MYDB}/log/${name}"
- local logdir=$CWD/log
- local db_install_log=${logdir}/${name}-db-install.log
- local db_upgrade_log=${logdir}/${name}-db-upgrade.log
- local dbdir="${MYDB}/${name}"
- local db_install=0
- local date=$(date "+%Y%m%d")
- local __cflags=$CFLAGS
- local __cxxflags=$CXXFLAGS
- local cmd=
+	local name="mysql"
+	local version="${MYSQL_VERSION}"
+	local tarball="mariadb-${version}.tar.gz"
+	local dir="mariadb-${version}"
+	local url="${MYSQL_URL}"
+	local mylogdir="${MYDB}/log/${name}"
+	local logdir="$CWD/log"
+	local db_install_log="${logdir}/${name}-db-install.log"
+	local db_upgrade_log="${logdir}/${name}-db-upgrade.log"
+	local dbdir="${MYDB}/${name}"
+	local db_install=0
+	local date="$(date '+%Y%m%d')"
+	local __cflags="$CFLAGS"
+	local __cxxflags="$CXXFLAGS"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- if [[ "$version" =~ 10.0.* ]]; then
-    apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
-    apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
-    apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
- fi
+	if [[ "$version" =~ 10.0.* ]]; then
+		apply_patch $CWD/patches/mariadb_dont-build-examples-and-tests.patch.gz 1
+		apply_patch $CWD/patches/mariadb_dont_include_maintainer.patch.gz 1
+		apply_patch $CWD/patches/mariadb_drop_O3_optimization_flag.patch.gz 1
+	fi
 
- # only version 10.0.22 has this issue, we will drop it soon
- if [ "$version" == "10.0.22" ]; then
-    apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
- fi
+	# only version 10.0.22 has this issue, we will drop it soon
+	if [ "$version" == "10.0.22" ]; then
+		apply_patch $CWD/patches/mariadb-fix-compilation.patch.gz 1
+	fi
 
- if [[ "$version" =~ 10.1.* ]]; then
-    apply_patch $CWD/patches/mariadb_10.1.x-dont-build-examples-and-tests.patch.gz 1
- fi
+	if [[ "$version" =~ 10.1.* ]]; then
+		apply_patch $CWD/patches/mariadb_10.1.x-dont-build-examples-and-tests.patch.gz 1
+	fi
 
- get_dependency ${name}
+	get_dependency ${name}
 
- export CFLAGS="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
- export CXXFLAGS="${CFLAGS} -felide-constructors -fno-rtti"
+	export CFLAGS="${CFLAGS} -fno-strict-aliasing -DBIG_JOINS=1 -fno-delete-null-pointer-checks"
+	export CXXFLAGS="${CFLAGS} -felide-constructors -fno-rtti"
 
- do_configure ${name} \
- "-DMYSQL_SERVER_SUFFIX=-buildpkg \
-  -DDEFAULT_CHARSET=utf8 \
-  -DDEFAULT_COLLATION=utf8_general_ci \
-  -DWITH_EXTRA_CHARSETS=complex \
-  -DWITH_EMBEDDED_SERVER=1 \
-  -DWITH_INNOBASE_STORAGE_ENGINE=1 \
-  -DWITH_ARCHIVE_STORAGE_ENGINE=1 \
-  -DWITH_TOKUDB_STORAGE_ENGINE=1 \
-  -DWITH_PARTITION_STORAGE_ENGINE=1 \
-  -DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
-  -DWITHOUT_FEDERATED_STORAGE_ENGINE=1 \
-  -DWITHOUT_BLACKHOLE_STORAGE_ENGINE=1 \
-  -DWITH_UNIT_TESTS=OFF \
-  -DENABLED_PROFILING=OFF \
-  -DENABLE_DEBUG_SYNC=OFF \
-  -DWITH_ZLIB=system \
-  -DWITH_SSL=system \
-  -DWITH_JEMALLOC=system \
-  -DWITH_READLINE=0 \
-  -DWITH_LIBWRAP=OFF \
-  -DINSTALL_LAYOUT=STANDALONE \
-  -DINSTALL_MYSQLDATADIR_STANDALONE=${dbdir} \
-  -DINSTALL_UNIX_ADDRDIR_STANDALONE=${TMPSRV}/mysql.sock \
-  -DINSTALL_SYSCONFDIR=${PREFIX}/${name}/conf \
-  -DINSTALL_SYSCONF2DIR=${PREFIX}/${name}/conf/my.cnf.d \
-  -DINSTALL_SBINDIR=libexec \
-  -DINSTALL_PLUGINDIR=lib/mysql/plugin \
-  -DMYSQL_DATADIR=${dbdir} \
-  -DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock"
+	do_configure ${name} \
+		"-DMYSQL_SERVER_SUFFIX=-buildpkg \
+		-DDEFAULT_CHARSET=utf8 \
+		-DDEFAULT_COLLATION=utf8_general_ci \
+		-DWITH_EXTRA_CHARSETS=complex \
+		-DWITH_EMBEDDED_SERVER=1 \
+		-DWITH_INNOBASE_STORAGE_ENGINE=1 \
+		-DWITH_ARCHIVE_STORAGE_ENGINE=1 \
+		-DWITH_TOKUDB_STORAGE_ENGINE=1 \
+		-DWITH_PARTITION_STORAGE_ENGINE=1 \
+		-DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
+		-DWITHOUT_FEDERATED_STORAGE_ENGINE=1 \
+		-DWITHOUT_BLACKHOLE_STORAGE_ENGINE=1 \
+		-DWITH_UNIT_TESTS=OFF \
+		-DENABLED_PROFILING=OFF \
+		-DENABLE_DEBUG_SYNC=OFF \
+		-DWITH_ZLIB=system \
+		-DWITH_SSL=system \
+		-DWITH_JEMALLOC=system \
+		-DWITH_READLINE=0 \
+		-DWITH_LIBWRAP=OFF \
+		-DINSTALL_LAYOUT=STANDALONE \
+		-DINSTALL_MYSQLDATADIR_STANDALONE=${dbdir} \
+		-DINSTALL_UNIX_ADDRDIR_STANDALONE=${TMPSRV}/mysql.sock \
+		-DINSTALL_SYSCONFDIR=${PREFIX}/${name}/conf \
+		-DINSTALL_SYSCONF2DIR=${PREFIX}/${name}/conf/my.cnf.d \
+		-DINSTALL_SBINDIR=libexec \
+		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
+		-DMYSQL_DATADIR=${dbdir} \
+		-DMYSQL_UNIX_ADDR=${TMPSRV}/mysql.sock"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
-    create_user mysql 10101 "MariaDB/MySQL Server" ${dbdir}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
+		create_user mysql 10101 "MariaDB/MySQL Server" ${dbdir}
 
-    [ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
-    chown_as_root mysql mysql ${dbdir}
-    [ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
-    chown_as_root mysql mysql ${mylogdir}
+		[ -d ${dbdir} ] || mkdir_as_root ${dbdir} 0770
+		chown_as_root mysql mysql ${dbdir}
+		[ -d ${mylogdir} ] || mkdir_as_root ${mylogdir} 0770
+		chown_as_root mysql mysql ${mylogdir}
 
-    ( cd /usr/bin
-      ln_as_root ../..${PREFIX}/${name}/bin/mysql_config .
-    )
+		( cd /usr/bin
+		  ln_as_root ../..${PREFIX}/${name}/bin/mysql_config .)
 
-    ld_add "${PREFIX}/${name}/lib" ${name}
-    ldconfig
+		ld_add "${PREFIX}/${name}/lib" ${name}
+		ldconfig
 
-    mkdir_as_root $TMPSRV 0777
-    chown_as_root root root $TMPSRV
+		mkdir_as_root $TMPSRV 0777
+		chown_as_root root root $TMPSRV
 
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
-    cp_as_root ../scripts/mysqlaccess.conf ${PREFIX}/${name}/conf/mysqlaccess.conf
-    chmod_as_root 0644 ${PREFIX}/${name}/conf/mysqlaccess.conf
+		[ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+		cp_as_root ../scripts/mysqlaccess.conf ${PREFIX}/${name}/conf/mysqlaccess.conf
+		chmod_as_root 0644 ${PREFIX}/${name}/conf/mysqlaccess.conf
 
-    rm_as_root ${PREFIX}/${name}/mysql-test
-    for file in $(find ${PREFIX}/${name}/ -name \*.a); do
-       rm_as_root ${file}
-    done
+		rm_as_root ${PREFIX}/${name}/mysql-test
+		for file in $(find ${PREFIX}/${name}/ -name \*.a); do
+			rm_as_root ${file}
+		done
 
-    if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
-       if [ -e ${PREFIX}/${name}/conf/my.cnf ]; then
-          msg info "Backing up my.cnf configuration file to my.cnf.${date} ..."
-          cp_as_root ${PREFIX}/${name}/conf/my.cnf ${PREFIX}/${name}/conf/my.cnf.${date}
-       fi
-       msg info "Copying new configuration file for ${name} (my.cnf) ..."
-       cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/my.cnf ] && \
-       $cmd sed -i \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          -e "s|@@MYDB@@|${MYDB}|g" \
-          -e "s|@@MYLOG@@|${MYDB}|g" \
-          ${PREFIX}/${name}/conf/my.cnf >/dev/null 2>&1
-       $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
+			if [ -e ${PREFIX}/${name}/conf/my.cnf ]; then
+				msg info "Backing up my.cnf configuration file to my.cnf.${date} ..."
+				cp_as_root ${PREFIX}/${name}/conf/my.cnf ${PREFIX}/${name}/conf/my.cnf.${date}
+			fi
+			msg info "Copying new configuration file for ${name} (my.cnf) ..."
+			cp_as_root $CWD/config.d/my.cnf ${PREFIX}/${name}/conf/my.cnf
+			chown_as_root root root ${PREFIX}/${name}/conf
+			[ -e ${PREFIX}/${name}/conf/my.cnf ] && \
+			$cmd sed -i \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				-e "s|@@MYDB@@|${MYDB}|g" \
+				-e "s|@@MYLOG@@|${MYDB}|g" \
+				${PREFIX}/${name}/conf/my.cnf >/dev/null 2>&1
+			$cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
+		fi
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@MYDB@@|${MYDB}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@MYDB@@|${MYDB}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+			fi
 
-    if [ ! -e ${dbdir}/mysql/db.frm ]; then
-       db_install=1
-       [ -e ${db_install_log} ] && rm -f ${db_install_log}
-       export PATH="${PREFIX}/${name}/bin:$PATH"
-       msg info "Installing MySQL database in ${dbdir} ..."
-       msg info "Logfile saved in ${db_install_log}"
-       $cmd ${PREFIX}/${name}/scripts/mysql_install_db \
-          --defaults-file=${PREFIX}/${name}/conf/my.cnf \
-          --basedir=${PREFIX}/${name} \
-          --datadir=${dbdir} \
-          --user=mysql > ${db_install_log} 2>&1
-    else
-      db_install=0
-      msg info "MySQL database found, we wont do nothing."
-    fi
+		if [ ! -e ${dbdir}/mysql/db.frm ]; then
+			db_install=1
+			[ -e ${db_install_log} ] && rm -f ${db_install_log}
+			export PATH="${PREFIX}/${name}/bin:$PATH"
+			msg info "Installing MySQL database in ${dbdir} ..."
+			msg info "Logfile saved in ${db_install_log}"
+			$cmd ${PREFIX}/${name}/scripts/mysql_install_db \
+				--defaults-file=${PREFIX}/${name}/conf/my.cnf \
+				--basedir=${PREFIX}/${name} \
+				--datadir=${dbdir} \
+				--user=mysql > ${db_install_log} 2>&1
+		else
+			db_install=0
+			msg info "MySQL database found, we wont do nothing."
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-           /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    start_service ${name}
+		start_service ${name}
 
-    if [ ${db_install} -eq 1 -a ${installoff} -eq 0 ]; then
-       msg info "Updating default MySQL root user password ..."
-       $cmd ${PREFIX}/${name}/bin/mysqladmin --defaults-file=${PREFIX}/${name}/conf/my.cnf \
-          -u root -h localhost password "${MYSQL_ROOT_PASSWORD}" >/dev/null 2>&1 || \
-          msg error "Failed to update the MySQL root user password."
-       msg info "Dropping all other MySQL users with empty passwords (for security reasons) ..."
-       $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
-          -Bse "set sql_safe_updates = 0; delete from mysql.user where Password = ''; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
-          msg error "Failed to drop users."
-       msg info "Dropping MySQL test database (we have no use for an empty database) ..."
-       $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
-          -Bse "drop database test; set sql_safe_updates = 0; delete from mysql.db; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
-          msg error "Failed to drop test database."
-       msg info "Running MySQL flush privileges, tables, status statements."
-       $cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
-          -Bse "flush privileges; flush tables; flush tables with read lock; flush status;" >/dev/null 2>&1 || \
-          msg error "Failed to run flush statements."
-       db_install=0
-    fi
+		if [ ${db_install} -eq 1 -a ${installoff} -eq 0 ]; then
+			msg info "Updating default MySQL root user password ..."
+			$cmd ${PREFIX}/${name}/bin/mysqladmin --defaults-file=${PREFIX}/${name}/conf/my.cnf \
+				-u root -h localhost password "${MYSQL_ROOT_PASSWORD}" >/dev/null 2>&1 || \
+				msg error "Failed to update the MySQL root user password."
+			msg info "Dropping all other MySQL users with empty passwords (for security reasons) ..."
+			$cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+				-Bse "set sql_safe_updates = 0; delete from mysql.user where Password = ''; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
+				msg error "Failed to drop users."
+			msg info "Dropping MySQL test database (we have no use for an empty database) ..."
+			$cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+				-Bse "drop database test; set sql_safe_updates = 0; delete from mysql.db; set sql_safe_updates = 1;" >/dev/null 2>&1 || \
+				msg error "Failed to drop test database."
+			msg info "Running MySQL flush privileges, tables, status statements."
+			$cmd ${PREFIX}/${name}/bin/mysql -u root -p${MYSQL_ROOT_PASSWORD} -h localhost \
+				-Bse "flush privileges; flush tables; flush tables with read lock; flush status;" >/dev/null 2>&1 || \
+				msg error "Failed to run flush statements."
+			db_install=0
+		fi
 
-    if [ ${db_install} -eq 0 ]; then
-       if [ -x ${PREFIX}/${name}/bin/mysql_upgrade ]; then
-          MYSQL_UPGRADE_PASSWORD="$MYSQL_ROOT_PASSWORD"
-          [ -r "$CWD/.mysql_upgrade_passwd" ] && MYSQL_UPGRADE_PASSWORD="$(cat $CWD/.mysql_upgrade_passwd 2>/dev/null)"
-          [ -e ${db_upgrade_log} ] && rm -f ${db_upgrade_log}
-          msg info "Running mysql_upgrade (if version didnt change, this wont do anything)"
-          msg info "Logfile saved in ${db_upgrade_log}"
-          ${PREFIX}/${name}/bin/mysql_upgrade --force \
-             -u root -p${MYSQL_UPGRADE_PASSWORD} -h localhost > ${db_upgrade_log} 2>&1 || \
-             msg warn "Failed to upgrade database or database is up to date."
-       else
-          msg error "Unable to find mysql_upgrade binary."
-       fi
-    fi
+		if [ ${db_install} -eq 0 ]; then
+			if [ -x ${PREFIX}/${name}/bin/mysql_upgrade ]; then
+				MYSQL_UPGRADE_PASSWORD="$MYSQL_ROOT_PASSWORD"
+				[ -r "$CWD/.mysql_upgrade_passwd" ] && MYSQL_UPGRADE_PASSWORD="$(cat $CWD/.mysql_upgrade_passwd 2>/dev/null)"
+				[ -e ${db_upgrade_log} ] && rm -f ${db_upgrade_log}
+				msg info "Running mysql_upgrade (if version didnt change, this wont do anything)"
+				msg info "Logfile saved in ${db_upgrade_log}"
+				${PREFIX}/${name}/bin/mysql_upgrade --force \
+					-u root -p${MYSQL_UPGRADE_PASSWORD} -h localhost > ${db_upgrade_log} 2>&1 || \
+					msg warn "Failed to upgrade database or database is up to date."
+			else
+				msg error "Unable to find mysql_upgrade binary."
+			fi
+		fi
 
-    for dir in data docs; do
-       rm_as_root ${PREFIX}/${name}/${dir}
-    done
+		for dir in data docs; do
+			rm_as_root ${PREFIX}/${name}/${dir}
+		done
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- export CFLAGS=$__cflags
- export CXXFLAGS=$__cxxflags
+	export CFLAGS="$__cflags"
+	export CXXFLAGS="$__cxxflags"
 
- cd $CWD
+	cd $CWD
 
- if [ ${buildall} -eq 0 ]; then
-    trigger pam_mysql "$PAM_MODULES_DIR"
-    trigger dovecot
-    trigger postfix
-    trigger php
- fi
-
+	if [ ${buildall} -eq 0 ]; then
+		trigger pam_mysql "$PAM_MODULES_DIR"
+		trigger dovecot
+		trigger postfix
+		trigger php
+	fi
 }
 
 # build and install nginx
 build_nginx()
 {
- local name="nginx"
- local version="${NGINX_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${NGINX_URL}"
- local wwwlog=/var/log/${name}
- local wwwdir=${DATA}/www
- local cmd=
+	local name="nginx"
+	local version="${NGINX_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${NGINX_URL}"
+	local wwwlog="/var/log/${name}"
+	local wwwdir="${DATA}/www"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
+	get_pkg ${url} ${tarball}
 
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/nginx-drop-server-name.patch.gz 1
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	apply_patch $CWD/patches/nginx-drop-server-name.patch.gz 1
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} \
- "--with-http_ssl_module \
-  --with-http_realip_module \
-  --with-http_addition_module \
-  --with-http_flv_module \
-  --with-http_gzip_static_module \
-  --with-http_sub_module \
-  --with-http_perl_module \
-  --with-file-aio \
-  --with-pcre \
-  --without-http_uwsgi_module \
-  --without-http_scgi_module \
-  --with-ipv6 \
-  --with-perl=/usr/bin/perl \
-  --without-http_uwsgi_module \
-  --without-http_scgi_module \
-  --without-http_memcached_module \
-  --without-http_geo_module \
-  --without-mail_pop3_module \
-  --without-mail_imap_module \
-  --without-mail_smtp_module \
-  --without-select_module \
-  --without-poll_module"
+	do_configure ${name} "\
+		--with-http_ssl_module \
+		--with-http_realip_module \
+		--with-http_addition_module \
+		--with-http_flv_module \
+		--with-http_gzip_static_module \
+		--with-http_sub_module \
+		--with-http_perl_module \
+		--with-file-aio \
+		--with-pcre \
+		--without-http_uwsgi_module \
+		--without-http_scgi_module \
+		--with-ipv6 \
+		--with-perl=/usr/bin/perl \
+		--without-http_uwsgi_module \
+		--without-http_scgi_module \
+		--without-http_memcached_module \
+		--without-http_geo_module \
+		--without-mail_pop3_module \
+		--without-mail_imap_module \
+		--without-mail_smtp_module \
+		--without-select_module \
+		--without-poll_module"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
-    create_user www 10100 "nginx http server" ${wwwdir}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
+		create_user www 10100 "nginx http server" ${wwwdir}
 
-    mkdir_as_root ${wwwlog} 0770
-    chown_as_root www root ${wwwlog}
-    mkdir_as_root ${wwwdir} 0755
+		mkdir_as_root ${wwwlog} 0770
+		chown_as_root www root ${wwwlog}
+		mkdir_as_root ${wwwdir} 0755
 
-    if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
-       mkdir_as_root ${PREFIX}/${name}/conf/sites.d
-       mkdir_as_root ${DATA}/www/${HOST}
-       [ -e ${PREFIX}/${name}/conf/${name}.conf ] && rm_as_root ${PREFIX}/${name}/conf/${name}.conf
-       msg info "Copying new configuration file for ${name} (${name}.conf) ..."
-       cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
-       [ -e ${PREFIX}/${name}/conf/fastcgi.conf ] && rm_as_root ${PREFIX}/${name}/conf/fastcgi.conf
-       msg info "Copying new configuration file for ${name} (fastcgi.conf) ..."
-       cp_as_root $CWD/config.d/fastcgi.conf ${PREFIX}/${name}/conf/fastcgi.conf
-       [ -e ${PREFIX}/${name}/conf/proxy.conf ] && rm_as_root ${PREFIX}/${name}/conf/proxy.conf
-       msg info "Copying new configuration file for ${name} (proxy.conf) ..."
-       cp_as_root $CWD/config.d/proxy.conf ${PREFIX}/${name}/conf/proxy.conf
-       [ -e ${PREFIX}/${name}/conf/sites.d/${HOST}.conf ] && rm_as_root ${PREFIX}/${name}/conf/sites.d/${HOST}.conf
-       msg info "Copying new configuration file for ${name} (${HOST}.conf) ..."
-       cp_as_root $CWD/config.d/${name}.example.conf ${PREFIX}/${name}/conf/sites.d/${HOST}.conf
-       [ -e ${PREFIX}/${name}/conf/${name}.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          ${PREFIX}/${name}/conf/${name}.conf >/dev/null 2>&1
-       [ -e ${PREFIX}/${name}/conf/sites.d/${HOST}.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@HOST@@|${HOST}|g" \
-          -e "s|@@DATA@@|${DATA}/www/${HOST}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/sites.d/${HOST}.conf >/dev/null 2>&1
-       msg info "Copying PHP example file for ${name} (index.php) ..."
-       cp_as_root $CWD/config.d/nginx-test-pages/index.php ${DATA}/www/${HOST}/index.php
-       msg info "Copying HTML example file for ${name} (index.htm) ..."
-       cp_as_root $CWD/config.d/nginx-test-pages/index.htm ${DATA}/www/${HOST}/index.htm
-       $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
-       chown_as_root root root ${DATA}/www/${HOST}
-       chown_as_root root root ${PREFIX}/${name}/conf
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
+			mkdir_as_root ${PREFIX}/${name}/conf/sites.d
+			mkdir_as_root ${DATA}/www/${HOST}
+			[ -e ${PREFIX}/${name}/conf/${name}.conf ] && rm_as_root ${PREFIX}/${name}/conf/${name}.conf
+			msg info "Copying new configuration file for ${name} (${name}.conf) ..."
+			cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
+			[ -e ${PREFIX}/${name}/conf/fastcgi.conf ] && rm_as_root ${PREFIX}/${name}/conf/fastcgi.conf
+			msg info "Copying new configuration file for ${name} (fastcgi.conf) ..."
+			cp_as_root $CWD/config.d/fastcgi.conf ${PREFIX}/${name}/conf/fastcgi.conf
+			[ -e ${PREFIX}/${name}/conf/proxy.conf ] && rm_as_root ${PREFIX}/${name}/conf/proxy.conf
+			msg info "Copying new configuration file for ${name} (proxy.conf) ..."
+			cp_as_root $CWD/config.d/proxy.conf ${PREFIX}/${name}/conf/proxy.conf
+			[ -e ${PREFIX}/${name}/conf/sites.d/${HOST}.conf ] && rm_as_root ${PREFIX}/${name}/conf/sites.d/${HOST}.conf
+			msg info "Copying new configuration file for ${name} (${HOST}.conf) ..."
+			cp_as_root $CWD/config.d/${name}.example.conf ${PREFIX}/${name}/conf/sites.d/${HOST}.conf
+			[ -e ${PREFIX}/${name}/conf/${name}.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				${PREFIX}/${name}/conf/${name}.conf >/dev/null 2>&1
+			[ -e ${PREFIX}/${name}/conf/sites.d/${HOST}.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@HOST@@|${HOST}|g" \
+				-e "s|@@DATA@@|${DATA}/www/${HOST}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/${name}/conf/sites.d/${HOST}.conf >/dev/null 2>&1
+			msg info "Copying PHP example file for ${name} (index.php) ..."
+			cp_as_root $CWD/config.d/nginx-test-pages/index.php ${DATA}/www/${HOST}/index.php
+			msg info "Copying HTML example file for ${name} (index.htm) ..."
+			cp_as_root $CWD/config.d/nginx-test-pages/index.htm ${DATA}/www/${HOST}/index.htm
+			$cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
+			chown_as_root root root ${DATA}/www/${HOST}
+			chown_as_root root root ${PREFIX}/${name}/conf
+		fi
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    start_service ${name}
+		start_service ${name}
 
-    rm_as_root "${PREFIX}/${name}/html"
+		rm_as_root "${PREFIX}/${name}/html"
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install fcgiwrap
 build_fcgiwrap()
 {
- local name="fcgiwrap"
- local version="${FCGIWRAP_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-master"
- local url="${FCGIWRAP_URL}"
- local spawnname="spawn-fcgi-${SPAWNFCGI_VERSION}"
- local spawntar="${spawnname}.tar.gz"
- local spawnurl="${SPAWNFCGI_URL}"
- local cmd=
+	local name="fcgiwrapi"
+	local version="${FCGIWRAP_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-master"
+	local url="${FCGIWRAP_URL}"
+	local spawnname="spawn-fcgi-${SPAWNFCGI_VERSION}"
+	local spawntar="${spawnname}.tar.gz"
+	local spawnurl="${SPAWNFCGI_URL}"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure nginx is already installed.
- need_pkg ${name} nginx
+	# we need to make sure nginx is already installed.
+	need_pkg ${name} nginx
 
- # build spawn-fcgi first (fcgiwrap requires it)
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${spawnname} ] && rm -fr ${spawnname} || :
+	# build spawn-fcgi first (fcgiwrap requires it)
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${spawnname} ] && rm -fr ${spawnname} || :
 
- get_pkg ${spawnurl} ${spawntar}
+	get_pkg ${spawnurl} ${spawntar}
 
- unpack_source ${spawntar}
- chown_dir ${spawnname}
- cd ${spawnname} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	unpack_source ${spawntar}
+	chown_dir ${spawnname}
+	cd ${spawnname} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- do_configure spawn-fcgi " " "${PREFIX}/${name}"
- run_make spawn-fcgi
- run_install spawn-fcgi
+	do_configure spawn-fcgi " " "${PREFIX}/${name}"
 
- if [ ${installoff} -eq 0 ]; then
-    strip_file ${PREFIX}/${name}/bin/spawn-fcgi
- fi
+	run_make spawn-fcgi
+	run_install spawn-fcgi
 
- cd $CWD
+	if [ ${installoff} -eq 0 ]; then
+		strip_file ${PREFIX}/${name}/bin/spawn-fcgi
+	fi
 
- # build fcgiwrap
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	cd $CWD
 
- get_pkg ${url} ${tarball}
+	# build fcgiwrap
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
 
- get_dependency ${name}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
- msg info "Running /usr/bin/autoreconf --install --force ..."
- /usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
- 
- do_configure ${name}
- run_make ${name}
- run_install ${name}
+	get_dependency ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
+	[ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
+	msg info "Running /usr/bin/autoreconf --install --force ..."
+	/usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
 
-    if [ ! -e /etc/init.d/fcgiwrap ]; then
-       msg info "Copying start/stop script for fcgiwrap (/etc/init.d/fcgiwrap) ..."
-       cp_as_root $CWD/scripts/fcgiwrap /etc/init.d/fcgiwrap
-       chown_as_root root root /etc/init.d/fcgiwrap
-       chmod_as_root 0755 /etc/init.d/fcgiwrap
-       [ -e /etc/init.d/fcgiwrap ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          /etc/init.d/fcgiwrap >/dev/null 2>&1
-    fi
+	do_configure ${name}
 
-    start_service ${name}
+	run_make ${name}
+	run_install ${name}
 
-    for dir in man share; do
-       rm_as_root "${PREFIX}/${name}/${dir}"
-    done
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if [ ! -e /etc/init.d/fcgiwrap ]; then
+			msg info "Copying start/stop script for fcgiwrap (/etc/init.d/fcgiwrap) ..."
+			cp_as_root $CWD/scripts/fcgiwrap /etc/init.d/fcgiwrap
+			chown_as_root root root /etc/init.d/fcgiwrap
+			chmod_as_root 0755 /etc/init.d/fcgiwrap
+			[ -e /etc/init.d/fcgiwrap ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				/etc/init.d/fcgiwrap >/dev/null 2>&1
+		fi
 
- cd $CWD
+		start_service ${name}
+
+		for dir in man share; do
+			rm_as_root "${PREFIX}/${name}/${dir}"
+		done
+
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
+
+	cd $CWD
 }
 
 # build and install php
 build_php()
 {
- local name="php"
- local version="${PHP_VERSION}"
- local tarball="${name}-${version}.tar.bz2"
- local dir="${name}-${version}"
- local url="${PHP_URL}"
- local wwwdir=${DATA}/www
- local local_deps=
- local fpm_systemd=
- local cmd=
+	local name="php"
+	local version="${PHP_VERSION}"
+	local tarball="${name}-${version}.tar.bz2"
+	local dir="${name}-${version}"
+	local url="${PHP_URL}"
+	local wwwdir="${DATA}/www"
+	local local_deps=""
+	local fpm_systemd=""
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure mysql is already installed.
- need_pkg ${name} mysql
+	# we need to make sure mysql is already installed.
+	need_pkg ${name} mysql
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- if is_systemd; then
-    local_deps="libsystemd-daemon-dev libsystemd-dev"
-    fpm_systemd="--with-fpm-systemd"
- fi
+	if is_systemd; then
+		local_deps="libsystemd-daemon-dev libsystemd-dev"
+		fpm_systemd="--with-fpm-systemd"
+	fi
 
- get_dependency "${name}" "${local_deps}"
+	get_dependency "${name}" "${local_deps}"
 
- export EXTENSION_DIR=${PREFIX}/${name}/modules
- export PEAR_INSTALLDIR=${PREFIX}/${name}/pear
- export PHP_MYSQLND_ENABLED=yes
- export PHP_MYSQLND_COMPRESSION_SUPPORT=yes
+	export EXTENSION_DIR=${PREFIX}/${name}/modules
+	export PEAR_INSTALLDIR=${PREFIX}/${name}/pear
+	export PHP_MYSQLND_ENABLED=yes
+	export PHP_MYSQLND_COMPRESSION_SUPPORT=yes
 
- do_configure ${name} \
- "--enable-inline-optimization \
-  --enable-cgi \
-  --enable-shared \
-  --enable-fpm $fpm_systemd \
-  --disable-rpath \
-  --without-pear \
-  --without-gdbm \
-  --disable-cli \
-  --disable-debug \
-  --disable-static \
-  --disable-opcache \
-  --disable-opcache-file \
-  --with-fpm-user=www \
-  --with-fpm-group=www \
-  --with-pic \
-  --with-mm \
-  --with-mhash \
-  --with-curl=shared \
-  --with-bz2=shared \
-  --with-gd=shared \
-  --with-gettext=shared \
-  --with-pcre-regex \
-  --with-iconv=shared \
-  --with-mcrypt=shared \
-  --with-mysql=shared,mysqlnd \
-  --with-mysqli=shared,mysqlnd \
-  --with-openssl=shared \
-  --with-pdo-mysql=shared,mysqlnd \
-  --with-pdo-sqlite=shared \
-  --with-pspell=shared \
-  --with-sqlite3=shared \
-  --with-tidy=shared \
-  --with-xmlrpc=shared \
-  --with-xsl=shared \
-  --with-gettext=shared \
-  --with-zlib=shared \
-  --enable-libxml \
-  --enable-hash \
-  --enable-session \
-  --enable-exif=shared \
-  --enable-pcntl=shared \
-  --enable-bcmath=shared \
-  --enable-calendar=shared \
-  --enable-dba=shared \
-  --enable-ftp=shared \
-  --enable-gd-native-ttf \
-  --enable-mbstring=shared \
-  --enable-mbregex \
-  --enable-phar=shared \
-  --enable-posix=shared \
-  --enable-shmop=shared \
-  --enable-soap=shared \
-  --enable-sockets=shared \
-  --enable-sysvmsg=shared \
-  --enable-sysvsem=shared \
-  --enable-sysvshm=shared \
-  --enable-zip=shared \
-  --enable-fileinfo=shared \
-  --with-config-file-path=${PREFIX}/${name}/conf \
-  --with-config-file-scan-dir=${PREFIX}/${name}/conf/modules.d \
-  --with-freetype-dir=/usr \
-  --with-jpeg-dir=/usr \
-  --with-mysql-sock=${TMPSRV}/mysql.sock \
-  --with-mysqli=${PREFIX}/mysql/bin/mysql_config \
-  --with-pdo-mysql=${PREFIX}/mysql \
-  --with-mysql=${PREFIX}/mysql"
+	do_configure ${name} "\
+		--enable-inline-optimization \
+		--enable-cgi \
+		--enable-shared \
+		--enable-fpm $fpm_systemd \
+		--disable-rpath \
+		--without-pear \
+		--without-gdbm \
+		--disable-cli \
+		--disable-debug \
+		--disable-static \
+		--disable-opcache \
+		--disable-opcache-file \
+		--with-fpm-user=www \
+		--with-fpm-group=www \
+		--with-pic \
+		--with-mm \
+		--with-mhash \
+		--with-curl=shared \
+		--with-bz2=shared \
+		--with-gd=shared \
+		--with-gettext=shared \
+		--with-pcre-regex \
+		--with-iconv=shared \
+		--with-mcrypt=shared \
+		--with-mysql=shared,mysqlnd \
+		--with-mysqli=shared,mysqlnd \
+		--with-openssl=shared \
+		--with-pdo-mysql=shared,mysqlnd \
+		--with-pdo-sqlite=shared \
+		--with-pspell=shared \
+		--with-sqlite3=shared \
+		--with-tidy=shared \
+		--with-xmlrpc=shared \
+		--with-xsl=shared \
+		--with-gettext=shared \
+		--with-zlib=shared \
+		--enable-libxml \
+		--enable-hash \
+		--enable-session \
+		--enable-exif=shared \
+		--enable-pcntl=shared \
+		--enable-bcmath=shared \
+		--enable-calendar=shared \
+		--enable-dba=shared \
+		--enable-ftp=shared \
+		--enable-gd-native-ttf \
+		--enable-mbstring=shared \
+		--enable-mbregex \
+		--enable-phar=shared \
+		--enable-posix=shared \
+		--enable-shmop=shared \
+		--enable-soap=shared \
+		--enable-sockets=shared \
+		--enable-sysvmsg=shared \
+		--enable-sysvsem=shared \
+		--enable-sysvshm=shared \
+		--enable-zip=shared \
+		--enable-fileinfo=shared \
+		--with-config-file-path=${PREFIX}/${name}/conf \
+		--with-config-file-scan-dir=${PREFIX}/${name}/conf/modules.d \
+		--with-freetype-dir=/usr \
+		--with-jpeg-dir=/usr \
+		--with-mysql-sock=${TMPSRV}/mysql.sock \
+		--with-mysqli=${PREFIX}/mysql/bin/mysql_config \
+		--with-pdo-mysql=${PREFIX}/mysql \
+		--with-mysql=${PREFIX}/mysql"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
-    create_user www 10100 "nginx http server" ${wwwdir}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
+		create_user www 10100 "nginx http server" ${wwwdir}
 
-    mkdir_as_root /var/log/nginx 0770
-    chown_as_root www root /var/log/nginx
+		mkdir_as_root /var/log/nginx 0770
+		chown_as_root www root /var/log/nginx
 
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
-    [ -d ${PREFIX}/${name}/conf/fpm.d ] || mkdir_as_root ${PREFIX}/${name}/conf/fpm.d
-    [ -d ${PREFIX}/${name}/conf/modules.d ] || mkdir_as_root ${PREFIX}/${name}/conf/modules.d
+		[ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf
+		[ -d ${PREFIX}/${name}/conf/fpm.d ] || mkdir_as_root ${PREFIX}/${name}/conf/fpm.d
+		[ -d ${PREFIX}/${name}/conf/modules.d ] || mkdir_as_root ${PREFIX}/${name}/conf/modules.d
 
-    if [ ! -e ${PREFIX}/${name}/conf/${name}.ini ]; then
-       msg info "Copying new configuration file for ${name} (${name}.ini) ..."
-       cp_as_root $CWD/config.d/${name}.ini-5.6.x ${PREFIX}/${name}/conf/${name}.ini
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/${name}.ini ] && \
-       $cmd sed -i \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@DATA@@|${DATA}/www|g" \
-          ${PREFIX}/${name}/conf/${name}.ini >/dev/null 2>&1
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/${name}.ini ]; then
+			msg info "Copying new configuration file for ${name} (${name}.ini) ..."
+			cp_as_root $CWD/config.d/${name}.ini-5.6.x ${PREFIX}/${name}/conf/${name}.ini
+			chown_as_root root root ${PREFIX}/${name}/conf
+			[ -e ${PREFIX}/${name}/conf/${name}.ini ] && \
+			$cmd sed -i \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@DATA@@|${DATA}/www|g" \
+				${PREFIX}/${name}/conf/${name}.ini >/dev/null 2>&1
+		fi
 
-    if [ ! -e ${PREFIX}/${name}/conf/modules.d/modules.ini ]; then
-       msg info "Copying new configuration file for ${name} (modules.ini) ..."
-       cp_as_root $CWD/config.d/${name}-modules.ini ${PREFIX}/${name}/conf/modules.d/modules.ini
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/modules.d/modules.ini ]; then
+			msg info "Copying new configuration file for ${name} (modules.ini) ..."
+			cp_as_root $CWD/config.d/${name}-modules.ini ${PREFIX}/${name}/conf/modules.d/modules.ini
+		fi
 
-    if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
-       msg info "Copying new configuration file for ${name} (${name}-fpm.conf) ..."
-       [ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && rm_as_root ${PREFIX}/${name}/conf/${name}-fpm.conf
-       cp_as_root $CWD/config.d/${name}-fpm.conf ${PREFIX}/${name}/conf/${name}-fpm.conf
-       [ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/${name}-fpm.conf >/dev/null 2>&1
+		if [ ! -e ${PREFIX}/${name}/conf/.do-not-delete-me ]; then
+			msg info "Copying new configuration file for ${name} (${name}-fpm.conf) ..."
+			[ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && rm_as_root ${PREFIX}/${name}/conf/${name}-fpm.conf
+			cp_as_root $CWD/config.d/${name}-fpm.conf ${PREFIX}/${name}/conf/${name}-fpm.conf
+			[ -e ${PREFIX}/${name}/conf/${name}-fpm.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/${name}/conf/${name}-fpm.conf >/dev/null 2>&1
 
-       msg info "Copying new configuration file for default (www) pool (www.conf) ..."
-       [ -e ${PREFIX}/${name}/conf/fpm.d/www.conf ] && rm_as_root ${PREFIX}/${name}/conf/fpm.d/www.conf
-       cp_as_root $CWD/config.d/www-fpm-pool.conf ${PREFIX}/${name}/conf/fpm.d/www.conf
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          -e "s|@@DATA@@|${DATA}/www|g" \
-          ${PREFIX}/${name}/conf/fpm.d/www.conf >/dev/null 2>&1
-    
-       $cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
-       chown_as_root root root ${PREFIX}/${name}/conf
-       chmod_as_root 0644 ${PREFIX}/${name}/conf/${name}-fpm.conf
-       chmod_as_root 0644 ${PREFIX}/${name}/conf/fpm.d/www.conf
-    fi
+			msg info "Copying new configuration file for default (www) pool (www.conf) ..."
+			[ -e ${PREFIX}/${name}/conf/fpm.d/www.conf ] && rm_as_root ${PREFIX}/${name}/conf/fpm.d/www.conf
+			cp_as_root $CWD/config.d/www-fpm-pool.conf ${PREFIX}/${name}/conf/fpm.d/www.conf
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				-e "s|@@DATA@@|${DATA}/www|g" \
+				${PREFIX}/${name}/conf/fpm.d/www.conf >/dev/null 2>&1
 
-    if [ ! -e /etc/init.d/${name}-fpm ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-fpm) ..."
-       cp_as_root $CWD/scripts/${name}-fpm /etc/init.d/${name}-fpm
-       chown_as_root root root /etc/init.d/${name}-fpm
-       chmod_as_root 0755 /etc/init.d/${name}-fpm
-       [ -e /etc/init.d/${name}-fpm ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          /etc/init.d/${name}-fpm >/dev/null 2>&1
-    fi
+			$cmd touch ${PREFIX}/${name}/conf/.do-not-delete-me
+			chown_as_root root root ${PREFIX}/${name}/conf
+			chmod_as_root 0644 ${PREFIX}/${name}/conf/${name}-fpm.conf
+			chmod_as_root 0644 ${PREFIX}/${name}/conf/fpm.d/www.conf
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name}-fpm ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-fpm) ..."
+			cp_as_root $CWD/scripts/${name}-fpm /etc/init.d/${name}-fpm
+			chown_as_root root root /etc/init.d/${name}-fpm
+			chmod_as_root 0755 /etc/init.d/${name}-fpm
+			[ -e /etc/init.d/${name}-fpm ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				/etc/init.d/${name}-fpm >/dev/null 2>&1
+		fi
 
-    for dir in var php; do
-       rm_as_root ${PREFIX}/${name}/${dir}
-    done
-    for file in $(find ${PREFIX}/${name}/ -name \*.a); do
-       rm_as_root ${file}
-    done
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    for file in /appls/php/modules/opcache.so /appls/php/conf/modules.d/opcache.ini; do
-        [ -e $file ] && rm_as_root $file
-    done
+		for dir in var php; do
+			rm_as_root ${PREFIX}/${name}/${dir}
+		done
+		for file in $(find ${PREFIX}/${name}/ -name \*.a); do
+			rm_as_root ${file}
+		done
+		for file in /appls/php/modules/opcache.so /appls/php/conf/modules.d/opcache.ini; do
+			[ -e $file ] && rm_as_root $file
+		done
 
-    start_service ${name}-fpm
+		start_service ${name}-fpm
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install monit
 build_monit()
 {
- local name="monit"
- local version="${MONIT_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${MONIT_URL}"
+	local name="monit"
+	local version="${MONIT_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${MONIT_URL}"
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	apply_patch $CWD/patches/monit_rename-monitrc-to-monit.conf.patch.gz 1
 
- get_dependency ${name}
+	get_dependency ${name}
 
- [ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
- msg info "Running /usr/bin/autoreconf --install --force ..."
- /usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
+	[ -x /usr/bin/autoreconf ] || { msg error "autoreconf not found."; exit 1; }
+	msg info "Running /usr/bin/autoreconf --install --force ..."
+	/usr/bin/autoreconf --install --force >/dev/null 2>&1 || msg error "autoreconf failed."
 
- do_configure ${name} \
- "--program-prefix= \
-  --program-suffix= \
-  --enable-optimized"
+	do_configure ${name} "\
+		--program-prefix= \
+		--program-suffix= \
+		--enable-optimized"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
 
-    [ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
-    [ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0700
+		[ -d /var/run/${name} ] || mkdir_as_root /var/run/${name} 0750
+		[ -d ${PREFIX}/${name}/conf ] || mkdir_as_root ${PREFIX}/${name}/conf 0700
 
-    if [ ! -e ${PREFIX}/${name}/conf/${name}.conf ]; then
-       msg info "Copying new configuration file for ${name} (${name}.conf) ..."
-       cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       chmod_as_root 0600 ${PREFIX}/${name}/conf/${name}.conf
-       [ -e ${PREFIX}/${name}/conf/${name}.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          ${PREFIX}/${name}/conf/${name}.conf >/dev/null 2>&1
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/${name}.conf ]; then
+			msg info "Copying new configuration file for ${name} (${name}.conf) ..."
+			cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}.conf
+			chown_as_root root root ${PREFIX}/${name}/conf
+			chmod_as_root 0600 ${PREFIX}/${name}/conf/${name}.conf
+			[ -e ${PREFIX}/${name}/conf/${name}.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				${PREFIX}/${name}/conf/${name}.conf >/dev/null 2>&1
+		fi
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
-    
-    rm_as_root ${PREFIX}/${name}/share
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    start_service ${name}
+		rm_as_root ${PREFIX}/${name}/share
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		start_service ${name}
 
- cd $CWD
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
+
+	cd $CWD
 }
 
 # build and install postfix
 build_postfix()
 {
- local name="postfix"
- local version="${POSTFIX_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${POSTFIX_URL}"
- local queue="/var/spool/${name}"
- local lib="/var/lib/${name}"
- local vmaildir="${DATA}/mail/vmail"
- local date=$(date "+%Y%m%d")
- local cmd=
+	local name="postfix"
+	local version="${POSTFIX_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${POSTFIX_URL}"
+	local queue="/var/spool/${name}"
+	local lib="/var/lib/${name}"
+	local vmaildir="${DATA}/mail/vmail"
+	local date="$(date '+%Y%m%d')"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure that mysql is installed.
- need_pkg ${name} mysql
+	# we need to make sure that mysql is installed.
+	need_pkg ${name} mysql
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch.gz 1
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	apply_patch $CWD/patches/postfix-vda-${VDA_PATCH_VERSION}.patch.gz 1
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name}
- export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
- run_make ${name}
+	do_configure ${name}
+	export LD_LIBRARY_PATH="$(pwd)/lib:${LD_LIBRARY_PATH}"
+	run_make ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
-       msg info "Backing up main.cf configuration file to main.cf.${date} ..."
-       cp_as_root ${PREFIX}/${name}/conf/main.cf ${PREFIX}/${name}/conf/main.cf.${date}
-    fi
-    if [ -e ${PREFIX}/${name}/conf/master.cf ]; then
-       msg info "Backing up master.cf configuration file to master.cf.${date} ..."
-       cp_as_root ${PREFIX}/${name}/conf/master.cf ${PREFIX}/${name}/conf/master.cf.${date}
-    fi
- fi
+	if [ ${installoff} -eq 0 ]; then
+		if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
+			msg info "Backing up main.cf configuration file to main.cf.${date} ..."
+			cp_as_root ${PREFIX}/${name}/conf/main.cf ${PREFIX}/${name}/conf/main.cf.${date}
+		fi
 
- cd lib
-  for i in dns global master tls util milter; do
-     ln -sf lib${i}.a lib${name}-${i}.so.1.0.1
-     ln -sf lib${name}-${i}.so.1.0.1 lib${name}-${i}.so.1
-     ln -sf lib${i}.a lib${i}.so.1.0.1
-     ln -sf lib${i}.a lib${i}.so.1
-  done
- cd ..
+		if [ -e ${PREFIX}/${name}/conf/master.cf ]; then
+			msg info "Backing up master.cf configuration file to master.cf.${date} ..."
+			cp_as_root ${PREFIX}/${name}/conf/master.cf ${PREFIX}/${name}/conf/master.cf.${date}
+		fi
+	fi
 
- run_install ${name}
+	( cd lib
+	  for i in dns global master tls util milter; do
+		ln -sf lib${i}.a lib${name}-${i}.so.1.0.1
+		ln -sf lib${name}-${i}.so.1.0.1 lib${name}-${i}.so.1
+		ln -sf lib${i}.a lib${i}.so.1.0.1
+		ln -sf lib${i}.a lib${i}.so.1
+	  done
+	)
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
-    export LD_LIBRARY_PATH=
+	run_install ${name}
 
-    if ! getent group postdrop >/dev/null 2>&1; then
-       groupadd -g 10102 postdrop >/dev/null >/dev/null 2>&1 || { msg error "Failed to create group postdrop."; exit 1; }
-    fi
-    if ! getent passwd spamfilter >/dev/null 2>&1; then
-       useradd -c "SpamAssassin User" -u 10107 -l -g nogroup -m -s /bin/false -r spamfilter >/dev/null 2>&1 || { msg error "Failed to create user ${user}."; exit 1; }
-    fi
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
+		export LD_LIBRARY_PATH=
 
-    create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
-    create_user vmail 10106 "Virtual Mailbox" ${vmaildir}
-    $cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
-    $cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
+		if ! getent group postdrop >/dev/null 2>&1; then
+			groupadd -g 10102 postdrop >/dev/null >/dev/null 2>&1 || { msg error "Failed to create group postdrop."; exit 1; }
+		fi
+		if ! getent passwd spamfilter >/dev/null 2>&1; then
+			useradd -c "SpamAssassin User" \
+				-u 10107 -l -g nogroup -m -s /bin/false -r \
+				spamfilter >/dev/null 2>&1 || { msg error "Failed to create user ${user}."; exit 1; }
+		fi
 
-    mkdir_as_root ${lib}
-    mkdir_as_root ${queue}
-    mkdir_as_root ${vmaildir}
+		create_user postfix 10103 "Postfix Mail Server" /var/spool/postfix
+		create_user vmail 10106 "Virtual Mailbox" ${vmaildir}
+		$cmd usermod -a -G mail vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group mail."
+		$cmd usermod -a -G postfix vmail >/dev/null 2>&1 || msg error "Failed to add user vmail to group postfix."
 
-    for dir in active bounce corrupt defer deferred flush \
-                 hold incoming maildrop pid private public saved trace; do
-       mkdir_as_root ${queue}/${dir}
-       chown_as_root postfix root ${queue}/${dir}
-       chmod_as_root 0700 ${queue}/${dir}
-    done
+		mkdir_as_root ${lib}
+		mkdir_as_root ${queue}
+		mkdir_as_root ${vmaildir}
 
-    chown_as_root root postdrop ${PREFIX}/${name}/sbin/postqueue
-    chown_as_root root postdrop ${PREFIX}/${name}/sbin/postdrop
-    chown_as_root postfix postdrop ${queue}/public
-    chown_as_root postfix postdrop ${queue}/maildrop
-    chown_as_root postfix root ${lib}
-    chown_as_root vmail root ${vmaildir}
-    chmod_as_root 0770 ${vmaildir}
-    chmod_as_root 2755 ${PREFIX}/${name}/sbin/postqueue
-    chmod_as_root 2755 ${PREFIX}/${name}/sbin/postdrop
-    chmod_as_root 0770 ${queue}/maildrop
-    chmod_as_root 0770 ${queue}/public
-    chmod_as_root 0755 ${queue}/pid
-    chmod_as_root 0750 ${lib}
+		for dir in active bounce corrupt defer deferred flush \
+				hold incoming maildrop pid private public saved trace; do
+			mkdir_as_root ${queue}/${dir}
+			chown_as_root postfix root ${queue}/${dir}
+			chmod_as_root 0700 ${queue}/${dir}
+		done
 
-    ( cd ${PREFIX}/${name}
-      mv_as_root usr/sbin/sendmail sbin
-    )
-    mkdir_as_root ${PREFIX}/${name}/bin
-    ( cd ${PREFIX}/${name}/bin
-      ln_as_root ../sbin/sendmail newaliases
-      ln_as_root ../sbin/sendmail mailq
-    )
-    rm_as_root ${PREFIX}/${name}/{usr,var}
+		chown_as_root root postdrop ${PREFIX}/${name}/sbin/postqueue
+		chown_as_root root postdrop ${PREFIX}/${name}/sbin/postdrop
+		chown_as_root postfix postdrop ${queue}/public
+		chown_as_root postfix postdrop ${queue}/maildrop
+		chown_as_root postfix root ${lib}
+		chown_as_root vmail root ${vmaildir}
+		chmod_as_root 0770 ${vmaildir}
+		chmod_as_root 2755 ${PREFIX}/${name}/sbin/postqueue
+		chmod_as_root 2755 ${PREFIX}/${name}/sbin/postdrop
+		chmod_as_root 0770 ${queue}/maildrop
+		chmod_as_root 0770 ${queue}/public
+		chmod_as_root 0755 ${queue}/pid
+		chmod_as_root 0750 ${lib}
 
-    for bin in ${PREFIX}/${name}/sbin/* ; do
-       ( cd /usr/sbin
-         ln_as_root ../..${PREFIX}/${name}/sbin/$(basename $bin) .
-       )
-    done
+		( cd ${PREFIX}/${name}
+ 		  mv_as_root usr/sbin/sendmail sbin 
+		)
 
-    ( cd /usr/bin
-      ln_as_root ../..${PREFIX}/${name}/sbin/sendmail newaliases
-      ln_as_root ../..${PREFIX}/${name}/sbin/sendmail mailq
-      cd /usr/lib
-      ln_as_root ../..${PREFIX}/${name}/sbin/sendmail .
-    )
+		mkdir_as_root ${PREFIX}/${name}/bin
+		( cd ${PREFIX}/${name}/bin
+		  ln_as_root ../sbin/sendmail newaliases
+		  ln_as_root ../sbin/sendmail mailq
+		)
 
-    if [ -e /etc/aliases ]; then
-       msg info "Generating /etc/aliases.db for postfix ..."
-       $cmd ${PREFIX}/${name}/sbin/postalias /etc/aliases >/dev/null 2>&1
-       if [ $? -ne 0 ]; then
-          msg error "Failed to generate /etc/aliases.db file."
-       fi
-    fi
+		rm_as_root ${PREFIX}/${name}/{usr,var}
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		for bin in ${PREFIX}/${name}/sbin/* ; do
+			( cd /usr/sbin
+			  ln_as_root ../..${PREFIX}/${name}/sbin/$(basename $bin) . )
+		done
 
-    if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
-       $cmd sed -i \
-          -e "s|^command_directory.*|command_directory = ${PREFIX}/${name}/sbin|g" \
-          -e "s|^daemon_directory.*|daemon_directory = ${PREFIX}/${name}/libexec|g" \
-          -e "s|^html_directory.*|html_directory = ${PREFIX}/${name}/html|g" \
-          -e "s|^manpage_directory.*|manpage_directory = ${PREFIX}/${name}/man|g" \
-          -e "s|^sample_directory.*|sample_directory = ${PREFIX}/${name}/sample|g" \
-          -e "s|^readme_directory.*|readme_directory = ${PREFIX}/${name}/doc|g" \
-          ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
+		( cd /usr/bin
+		  ln_as_root ../..${PREFIX}/${name}/sbin/sendmail newaliases
+		  ln_as_root ../..${PREFIX}/${name}/sbin/sendmail mailq
+		  cd /usr/lib
+		  ln_as_root ../..${PREFIX}/${name}/sbin/sendmail . 
+		)
 
-       if ! $(grep -q ^inet_interfaces ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1); then
-          $cmd echo 'inet_interfaces = localhost' >> \
-             ${PREFIX}/${name}/conf/main.cf 2>/dev/null
-       fi
-    fi
+		if [ -e /etc/aliases ]; then
+			msg info "Generating /etc/aliases.db for postfix ..."
+			$cmd ${PREFIX}/${name}/sbin/postalias /etc/aliases >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				msg error "Failed to generate /etc/aliases.db file."
+			fi
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-           -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-           /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+		fi
 
-    for dir in doc html man var; do
-       rm_as_root ${PREFIX}/${name}/${dir}
-    done
+		if [ -e ${PREFIX}/${name}/conf/main.cf ]; then
+			$cmd sed -i \
+				-e "s|^command_directory.*|command_directory = ${PREFIX}/${name}/sbin|g" \
+				-e "s|^daemon_directory.*|daemon_directory = ${PREFIX}/${name}/libexec|g" \
+				-e "s|^html_directory.*|html_directory = ${PREFIX}/${name}/html|g" \
+				-e "s|^manpage_directory.*|manpage_directory = ${PREFIX}/${name}/man|g" \
+				-e "s|^sample_directory.*|sample_directory = ${PREFIX}/${name}/sample|g" \
+				-e "s|^readme_directory.*|readme_directory = ${PREFIX}/${name}/doc|g" \
+				${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1
 
-    for file in main.cf master.cf; do
-       rm_as_root ${PREFIX}/${name}/libexec/${file}
-    done
+			if ! $(grep -q ^inet_interfaces ${PREFIX}/${name}/conf/main.cf >/dev/null 2>&1); then
+				$cmd echo 'inet_interfaces = localhost' >> \
+					${PREFIX}/${name}/conf/main.cf 2>/dev/null
+			fi
+		fi
 
-    start_service ${name}
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		for dir in doc html man var; do
+			rm_as_root ${PREFIX}/${name}/${dir}
+		done
+		for file in main.cf master.cf; do
+			rm_as_root ${PREFIX}/${name}/libexec/${file}
+		done
 
- cd $CWD
+		start_service ${name}
+
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
+
+	cd $CWD
 }
 
 # build and install greyfix
 build_greyfix()
 {
- local name="greyfix"
- local version="${GREYFIX_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${GREYFIX_URL}"
- local cmd=
+	local name="greyfix"
+	local version="${GREYFIX_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${GREYFIX_URL}"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} "--disable-dependency-tracking"
+	do_configure ${name} "--disable-dependency-tracking"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
+		rm_as_root ${PREFIX}/${name}/var
+		mkdir_as_root /var/lib/${name}
+		chown_as_root nobody root /var/lib/${name}
+		chmod_as_root 0750 /var/lib/${name}
 
-    rm_as_root ${PREFIX}/${name}/var
-    mkdir_as_root /var/lib/${name}
-    chown_as_root nobody root /var/lib/${name}
-    chmod_as_root 0750 /var/lib/${name}
+		if [ ! -e ${PREFIX}/${name}/sbin/autogrey ]; then
+			msg info "Copying postfix integration script for ${name} (${PREFIX}/${name}/sbin/autogrey) ..."
+			cp_as_root $CWD/scripts/autogrey ${PREFIX}/${name}/sbin/autogrey
+			chown_as_root root root ${PREFIX}/${name}/sbin/autogrey
+			chmod_as_root 0755 ${PREFIX}/${name}/sbin/autogrey
+			[ -e ${PREFIX}/${name}/sbin/autogrey ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@HOST@@|${HOST}|g" \
+				${PREFIX}/${name}/sbin/autogrey >/dev/null 2>&1
+		fi
 
-    if [ ! -e ${PREFIX}/${name}/sbin/autogrey ]; then
-       msg info "Copying postfix integration script for ${name} (${PREFIX}/${name}/sbin/autogrey) ..."
-       cp_as_root $CWD/scripts/autogrey ${PREFIX}/${name}/sbin/autogrey
-       chown_as_root root root ${PREFIX}/${name}/sbin/autogrey
-       chmod_as_root 0755 ${PREFIX}/${name}/sbin/autogrey
-       [ -e ${PREFIX}/${name}/sbin/autogrey ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@HOST@@|${HOST}|g" \
-          ${PREFIX}/${name}/sbin/autogrey >/dev/null 2>&1
-    fi
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
-
- cd $CWD
+	cd $CWD
 }
 
 # build and install dovecot
 build_dovecot()
 {
- local name="dovecot"
- local version="${DOVECOT_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${DOVECOT_URL}"
- local cmd=
+	local name="dovecot"
+	local version="${DOVECOT_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${DOVECOT_URL}"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure that mysql is installed.
- need_pkg ${name} mysql
+	# we need to make sure that mysql is installed.
+		need_pkg ${name} mysql
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} \
- "--libexecdir=${PREFIX}/${name}/lib \
-  --with-moduledir=${PREFIX}/${name}/modules \
-  --disable-static \
-  --with-pam \
-  --with-mysql \
-  --with-sqlite \
-  --with-ssl=openssl \
-  --with-ssldir=${PREFIX}/${name}/ssl \
-  --with-rundir=/var/run/${name} \
-  --with-statedir=/var/lib/${name} \
-  --without-docs \
-  --with-sql=plugin \
-  --with-gssapi \
-  --with-solr \
-  --with-libcap \
-  --with-ioloop=epoll \
-  --with-mem-align=32 \
-  --with-zlib --with-bzlib"
+	do_configure ${name} "\
+		--libexecdir=${PREFIX}/${name}/lib \
+		--with-moduledir=${PREFIX}/${name}/modules \
+		--disable-static \
+		--with-pam \
+		--with-mysql \
+		--with-sqlite \
+		--with-ssl=openssl \
+		--with-ssldir=${PREFIX}/${name}/ssl \
+		--with-rundir=/var/run/${name} \
+		--with-statedir=/var/lib/${name} \
+		--without-docs \
+		--with-sql=plugin \
+		--with-gssapi \
+		--with-solr \
+		--with-libcap \
+		--with-ioloop=epoll \
+		--with-mem-align=32 \
+		--with-zlib \
+		--with-bzlib"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
 
-    mkdir_as_root ${PREFIX}/${name}/conf/${name}
-    mkdir_as_root /var/run/${name}
-    mkdir_as_root /var/lib/${name}
-    chmod_as_root 0750 /var/lib/${name}
+		mkdir_as_root ${PREFIX}/${name}/conf/${name}
+		mkdir_as_root /var/run/${name}
+		mkdir_as_root /var/lib/${name}
+		chmod_as_root 0750 /var/lib/${name}
 
-    create_user dovecot 10104 "Dovecot IMAP Server" /var/run/${name}
-    create_user dovenull 10105 "Dovecot Null User" /var/run/${name}
+		create_user dovecot 10104 "Dovecot IMAP Server" /var/run/${name}
+		create_user dovenull 10105 "Dovecot Null User" /var/run/${name}
 
-    if [ ! -e ${PREFIX}/${name}/conf/${name}/${name}.conf ]; then
-       msg info "Copying new configuration file for ${name} (${name}.conf) ..."
-       cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}
-       msg info "Copying new configuration subdir conf.d for ${name} ..."
-       $cmd cp -aRf doc/example-config/conf.d ${PREFIX}/${name}/conf/${name}
-       [ -e ${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf ] && \
-       $cmd sed -i \
-          -e "/^ssl_cert/ s/ssl_cert/# ssl_cert/" \
-          -e "/^ssl_key/ s/ssl_key/# ssl_key/" \
-          -e "/^#ssl[[:space:]]=/ s/#//" \
-          -e "/^ssl[[:space:]]=/ s/yes/no/" \
-          ${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf >/dev/null 2>&1
-       chown_as_root root root ${PREFIX}/${name}/conf
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/${name}/${name}.conf ]; then
+			msg info "Copying new configuration file for ${name} (${name}.conf) ..."
+			cp_as_root $CWD/config.d/${name}.conf ${PREFIX}/${name}/conf/${name}
+			msg info "Copying new configuration subdir conf.d for ${name} ..."
+			$cmd cp -aRf doc/example-config/conf.d ${PREFIX}/${name}/conf/${name}
+			[ -e ${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf ] && \
+			$cmd sed -i \
+				-e "/^ssl_cert/ s/ssl_cert/# ssl_cert/" \
+				-e "/^ssl_key/ s/ssl_key/# ssl_key/" \
+				-e "/^#ssl[[:space:]]=/ s/#//" \
+				-e "/^ssl[[:space:]]=/ s/yes/no/" \
+				${PREFIX}/${name}/conf/${name}/conf.d/10-ssl.conf >/dev/null 2>&1
+			chown_as_root root root ${PREFIX}/${name}/conf
+		fi
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
-    rm_as_root "${PREFIX}/${name}/conf/${name}/conf.d/Makefile*"
-    rm_as_root "${PREFIX}/${name}/share"
+		rm_as_root "${PREFIX}/${name}/conf/${name}/conf.d/Makefile*"
+		rm_as_root "${PREFIX}/${name}/share"
 
-    start_service ${name}
+		start_service ${name}
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install clamav
 build_clamav()
 {
- local name="clamav"
- local version="${CLAMAV_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${CLAMAV_URL}"
- local cmd=
+	local name="clamav"
+	local version="${CLAMAV_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${CLAMAV_URL}"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- create_user clamav 10108 "ClamAV Antivirus User" ${PREFIX}/${name}
+	create_user clamav 10108 "ClamAV Antivirus User" ${PREFIX}/${name}
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} \
- "--with-user=clamav \
-  --with-group=clamav \
-  --with-dbdir=/var/lib/${name} \
-  --disable-rpath \
-  --enable-clamdtop \
-  --enable-id-check \
-  --enable-dns-fix \
-  --program-prefix= \
-  --program-suffix="
+	do_configure ${name} "\
+		--with-user=clamav \
+		--with-group=clamav \
+		--with-dbdir=/var/lib/${name} \
+		--disable-rpath \
+		--enable-clamdtop \
+		--enable-id-check \
+		--enable-dns-fix \
+		--program-prefix= \
+		--program-suffix="
 
- run_make ${name}
+	run_make ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    stop_service ${name}-freshclam
-    stop_service ${name}-clamd
- fi
+	if [ ${installoff} -eq 0 ]; then
+		stop_service ${name}-freshclam
+		stop_service ${name}-clamd
+	fi
 
- run_install ${name}
+	run_install ${name}
 
- strip_dir ${PREFIX}/${name}
 
- if [ ${installoff} -eq 0 ]; then
-    mkdir_as_root /var/lib/${name} 0750
-    chown_as_root clamav root /var/lib/${name}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
 
-    mkdir_as_root /var/log/${name} 0750
-    chown_as_root clamav root /var/log/${name}
+		mkdir_as_root /var/lib/${name} 0750
+		chown_as_root clamav root /var/lib/${name}
 
-    mkdir_as_root ${PREFIX}/${name}/run 0750
-    chown_as_root clamav root ${PREFIX}/${name}/run
+		mkdir_as_root /var/log/${name} 0750
+		chown_as_root clamav root /var/log/${name}
 
-    mkdir_as_root $TMPSRV 0777
-    chown_as_root root root $TMPSRV
+		mkdir_as_root ${PREFIX}/${name}/run 0750
+		chown_as_root clamav root ${PREFIX}/${name}/run
 
-    if [ ! -e ${PREFIX}/${name}/conf/clamd.conf ]; then
-       msg info "Copying new configuration file for ${name} (clamd.conf) ..."
-       [ -e ${PREFIX}/${name}/conf/clamd.conf ] && rm_as_root ${PREFIX}/${name}/conf/clamd.conf
-       cp_as_root $CWD/config.d/clamd.conf ${PREFIX}/${name}/conf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/clamd.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/clamd.conf >/dev/null 2>&1
-    fi
-    if [ ! -e ${PREFIX}/${name}/conf/freshclam.conf ]; then
-       msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
-       [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && rm_as_root ${PREFIX}/${name}/conf/freshclam.conf
-       cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/freshclam.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/freshclam.conf >/dev/null 2>&1
-    fi
+		mkdir_as_root $TMPSRV 0777
+		chown_as_root root root $TMPSRV
 
-    if [ ! -e /etc/init.d/${name}-clamd ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-clamd) ..."
-       cp_as_root $CWD/scripts/${name}-clamd /etc/init.d/${name}-clamd
-       chown_as_root root root /etc/init.d/${name}-clamd
-       chmod_as_root 0755 /etc/init.d/${name}-clamd
-       [ -e /etc/init.d/${name}-clamd ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name}-clamd >/dev/null 2>&1
-    fi
-    if [ ! -e /etc/init.d/${name}-freshclam ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-freshclam) ..."
-       cp_as_root $CWD/scripts/${name}-freshclam /etc/init.d/${name}-freshclam
-       chown_as_root root root /etc/init.d/${name}-freshclam
-       chmod_as_root 0755 /etc/init.d/${name}-freshclam
-       [ -e /etc/init.d/${name}-freshclam ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name}-freshclam >/dev/null 2>&1
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/clamd.conf ]; then
+			msg info "Copying new configuration file for ${name} (clamd.conf) ..."
+			[ -e ${PREFIX}/${name}/conf/clamd.conf ] && rm_as_root ${PREFIX}/${name}/conf/clamd.conf
+			cp_as_root $CWD/config.d/clamd.conf ${PREFIX}/${name}/conf
+			chown_as_root root root ${PREFIX}/${name}/conf
+			[ -e ${PREFIX}/${name}/conf/clamd.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/${name}/conf/clamd.conf >/dev/null 2>&1
+		fi
 
-    [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
-    if [ ! -e /etc/profile.d/${name}.sh ]; then
-       msg info "Copying ${name}.sh to /etc/profile.d ... "
-       cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-       chown_as_root root root /etc/profile.d/${name}.sh
-       chmod_as_root 0644 /etc/profile.d/${name}.sh
-       [ -e /etc/profile.d/${name}.sh ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/profile.d/${name}.sh >/dev/null 2>&1
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/freshclam.conf ]; then
+			msg info "Copying new configuration file for ${name} (freshclam.conf) ..."
+			[ -e ${PREFIX}/${name}/conf/freshclam.conf ] && rm_as_root ${PREFIX}/${name}/conf/freshclam.conf
+			cp_as_root $CWD/config.d/freshclam.conf ${PREFIX}/${name}/conf
+			chown_as_root root root ${PREFIX}/${name}/conf
+			[ -e ${PREFIX}/${name}/conf/freshclam.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/${name}/conf/freshclam.conf >/dev/null 2>&1
+		fi
 
-    if [ -d /var/lib/${name} ]; then
-       msg info "Updating ${name} anti-virus definitions ..."
-       msg info " -- please wait, time may take a while, depending on your internet connetion speed."
-       ${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
-       if [ $? -ne 0 ]; then
-          msg warn "something happened, wasnt able to update anti-virus definitions."
-       fi
-    fi
+		if [ ! -e /etc/init.d/${name}-clamd ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-clamd) ..."
+			cp_as_root $CWD/scripts/${name}-clamd /etc/init.d/${name}-clamd
+			chown_as_root root root /etc/init.d/${name}-clamd
+			chmod_as_root 0755 /etc/init.d/${name}-clamd
+			[ -e /etc/init.d/${name}-clamd ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name}-clamd >/dev/null 2>&1
+		fi
 
-    start_service ${name}-clamd
-    start_service ${name}-freshclam
+		if [ ! -e /etc/init.d/${name}-freshclam ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}-freshclam) ..."
+			cp_as_root $CWD/scripts/${name}-freshclam /etc/init.d/${name}-freshclam
+			chown_as_root root root /etc/init.d/${name}-freshclam
+			chmod_as_root 0755 /etc/init.d/${name}-freshclam
+			[ -e /etc/init.d/${name}-freshclam ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name}-freshclam >/dev/null 2>&1
+		fi
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+		if [ ! -e /etc/profile.d/${name}.sh ]; then
+			msg info "Copying ${name}.sh to /etc/profile.d ... "
+			cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+			chown_as_root root root /etc/profile.d/${name}.sh
+			chmod_as_root 0644 /etc/profile.d/${name}.sh
+			[ -e /etc/profile.d/${name}.sh ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/profile.d/${name}.sh >/dev/null 2>&1
+		fi
 
- cd $CWD
+		if [ -d /var/lib/${name} ]; then
+			msg info "Updating ${name} anti-virus definitions ..."
+			msg info " -- please wait, time may take a while, depending on your internet connetion speed."
+			${PREFIX}/${name}/bin/freshclam >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				msg warn "something happened, wasnt able to update anti-virus definitions."
+			fi
+		fi
+
+		start_service ${name}-clamd
+		start_service ${name}-freshclam
+
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
+
+	cd $CWD
 }
 
 # build and install clamsmtp
 build_clamsmtp()
 {
- local name="clamsmtp"
- local version="${CLAMSMTP_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${CLAMSMTP_URL}"
- local cmd=
+	local name="clamsmtp"
+	local version="${CLAMSMTP_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${CLAMSMTP_URL}"
+	local cmd=""
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure that clamav is installed.
- need_pkg ${name} clamav
+	# we need to make sure that clamav is installed.
+	need_pkg ${name} clamav
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/${name}_use_mkstemp.patch.gz 1
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	apply_patch $CWD/patches/${name}_use_mkstemp.patch.gz 1
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} "--disable-dependency-tracking"
+	do_configure ${name} "--disable-dependency-tracking"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    strip_dir ${PREFIX}/${name}
+	if [ ${installoff} -eq 0 ]; then
+		strip_dir ${PREFIX}/${name}
 
-    mkdir_as_root ${PREFIX}/${name}/conf
-    mkdir_as_root /var/run/${name}
-    chown_as_root clamav root /var/run/${name}
-    chmod_as_root 0755 /var/run/${name}
+		mkdir_as_root ${PREFIX}/${name}/conf
+		mkdir_as_root /var/run/${name}
+		chown_as_root clamav root /var/run/${name}
+		chmod_as_root 0755 /var/run/${name}
 
-    if [ ! -e ${PREFIX}/${name}/conf/${name}d.conf ]; then
-       msg info "Copying new configuration file for ${name} (${name}d.conf) ..."
-       cp_as_root $CWD/config.d/${name}d.conf ${PREFIX}/${name}/conf/${name}d.conf
-       chown_as_root root root ${PREFIX}/${name}/conf
-       [ -e ${PREFIX}/${name}/conf/${name}d.conf ] && \
-       $cmd sed -i \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/${name}/conf/${name}d.conf >/dev/null 2>&1
-    fi
+		if [ ! -e ${PREFIX}/${name}/conf/${name}d.conf ]; then
+			msg info "Copying new configuration file for ${name} (${name}d.conf) ..."
+			cp_as_root $CWD/config.d/${name}d.conf ${PREFIX}/${name}/conf/${name}d.conf
+			chown_as_root root root ${PREFIX}/${name}/conf
+			[ -e ${PREFIX}/${name}/conf/${name}d.conf ] && \
+			$cmd sed -i \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/${name}/conf/${name}d.conf >/dev/null 2>&1
+		fi
 
-    if [ ! -e /etc/init.d/${name} ]; then
-       msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
-       cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
-       chown_as_root root root /etc/init.d/${name}
-       chmod_as_root 0755 /etc/init.d/${name}
-       [ -e /etc/init.d/${name} ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-          /etc/init.d/${name} >/dev/null 2>&1
-    fi
+		if [ ! -e /etc/init.d/${name} ]; then
+			msg info "Copying start/stop script for ${name} (/etc/init.d/${name}) ..."
+			cp_as_root $CWD/scripts/${name} /etc/init.d/${name}
+			chown_as_root root root /etc/init.d/${name}
+			chmod_as_root 0755 /etc/init.d/${name}
+			[ -e /etc/init.d/${name} ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+				/etc/init.d/${name} >/dev/null 2>&1
+		fi
 
-    start_service ${name}
+		start_service ${name}
 
-    if ! $(update_pkg_version "$name" "$version"); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version"); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install pam_mysql
 build_pam_mysql()
 {
- local name="pam_mysql"
- local version="${PAM_MYSQL_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${PAM_MYSQL_URL}"
+	local name="pam_mysql"
+	local version="${PAM_MYSQL_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${PAM_MYSQL_URL}"
 
- # we need to make sure that mysql is installed.
- need_pkg ${name} mysql
+	# we need to make sure that mysql is installed.
+	need_pkg ${name} mysql
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
- apply_patch $CWD/patches/${name}_openssl.patch.gz 1
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	apply_patch $CWD/patches/${name}_openssl.patch.gz 1
 
- # In some newer systems, pam modules are not in /lib/security, but some other place.
- if [ "$PAM_MODULES_DIR" = "" ]; then
-    msg err "$name cant be build, unable to set PAM_MODULES_DIR"
-    exit 1
- fi
+	# In some newer systems, pam modules are not in /lib/security, but some other place.
+	if [ "$PAM_MODULES_DIR" == "" ]; then
+		msg err "$name cant be build, unable to set PAM_MODULES_DIR"
+		exit 1
+	fi
 
- get_dependency ${name}
+	get_dependency ${name}
 
- do_configure ${name} \
- "--with-openssl \
-  --with-cyrus-sasl=/usr \
-  --with-pam=/usr \
-  --with-mysql=${PREFIX}/mysql \
-  --with-pam-mods-dir=${PAM_MODULES_DIR}"
+	do_configure ${name} "\
+		--with-openssl \
+		--with-cyrus-sasl=/usr \
+		--with-pam=/usr \
+		--with-mysql=${PREFIX}/mysql \
+		--with-pam-mods-dir=${PAM_MODULES_DIR}"
 
- run_make ${name}
- run_install ${name}
+	run_make ${name}
+	run_install ${name}
 
- if [ ${installoff} -eq 0 ]; then
-    rm_as_root ${PAM_MODULES_DIR}/${name}.la
-    chmod_as_root 0644 ${PAM_MODULES_DIR}/${name}.so
-    strip_file ${PAM_MODULES_DIR}/${name}.so
+	if [ ${installoff} -eq 0 ]; then
+		rm_as_root ${PAM_MODULES_DIR}/${name}.la
+		chmod_as_root 0644 ${PAM_MODULES_DIR}/${name}.so
+		strip_file ${PAM_MODULES_DIR}/${name}.so
 
-    if ! $(update_pkg_version "$name" "$version" "${PAM_MODULES_DIR}" ); then
-        msg error "Failed to update $name version file."
-        exit 1
-    fi
- fi
+		if ! $(update_pkg_version "$name" "$version" "${PAM_MODULES_DIR}" ); then
+			msg error "Failed to update $name version file."
+			exit 1
+		fi
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install phpmyadmin
 build_phpmyadmin()
 {
- local name="phpmyadmin"
- local version="${PHPMYADMIN_VERSION}"
- local tarball="phpMyAdmin-${version}-all-languages.tar.gz"
- local dir="phpMyAdmin-${version}-all-languages"
- local url="${PHPMYADMIN_URL}"
- local wwwdir=${DATA}/www
- local cmd=
+	local name="phpmyadmin"
+	local version="${PHPMYADMIN_VERSION}"
+	local tarball="phpMyAdmin-${version}-all-languages.tar.gz"
+	local dir="phpMyAdmin-${version}-all-languages"
+	local url="${PHPMYADMIN_URL}"
+	local wwwdir="${DATA}/www"
+	local cmd=""
 
- if [ ${installoff} -eq 1 ]; then
-    msg warn "There is no install section for ${name}."
-    exit 1
- fi
+	if [ ${installoff} -eq 1 ]; then
+		msg warn "There is no install section for ${name}."
+		exit 1
+	fi
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- # we need to make sure that mysql is installed.
- need_pkg ${name} mysql
+	# we need to make sure that mysql is installed.
+	need_pkg ${name} mysql
 
- # we need to make sure that nginx is installed.
- need_pkg ${name} nginx
+	# we need to make sure that nginx is installed.
+	need_pkg ${name} nginx
 
- # we need to make sure that php is installed.
- need_pkg ${name} php
+	# we need to make sure that php is installed.
+	need_pkg ${name} php
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- mkdir_as_root ${wwwdir}
- mkdir_as_root ${PREFIX}/${name}
+	mkdir_as_root ${wwwdir}
+	mkdir_as_root ${PREFIX}/${name}
 
- ( cd ${wwwdir}
-   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name} .
- )
+	( cd ${wwwdir}
+	  [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name} .
+	)
 
- $cmd cp -aRf * ${PREFIX}/${name}
- for file in ChangeLog CONTRIBUTING.md DCO LICENSE README \
-           RELEASE-DATE-4.2.8 examples setup; do
-     rm_as_root ${PREFIX}/${name}/${file}
- done
+	$cmd cp -aRf * ${PREFIX}/${name}
+	for file in ChangeLog CONTRIBUTING.md DCO LICENSE README \
+			RELEASE-DATE-4.2.8 examples setup; do
+		rm_as_root ${PREFIX}/${name}/${file}
+	done
 
- if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
-    if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
-       mkdir_as_root ${PREFIX}/nginx/conf/sites.d
-       msg info "Copying new configuration file for nginx (${name}.conf) ..."
-       cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
-       [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
-       $cmd sed -i \
-          -e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
-          -e "s|@@DATA@@|${DATA}/www/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
-       chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
-    fi
- fi
+	if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
+		if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
+			mkdir_as_root ${PREFIX}/nginx/conf/sites.d
+			msg info "Copying new configuration file for nginx (${name}.conf) ..."
+			cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
+			[ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
+			$cmd sed -i \
+				-e "s|@@PREFIX@@|${PREFIX}/nginx|g" \
+				-e "s|@@DATA@@|${DATA}/www/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
+			chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
+		fi
+	fi
 
- if [ ! -e ${PREFIX}/${name}/config.inc.php ]; then
-    msg info "Generating a default configuration for ${name} (${PREFIX}/${name}/config.inc.php) ..."
-    $cmd cat << EOF > ${PREFIX}/${name}/config.inc.php
+	if [ ! -e ${PREFIX}/${name}/config.inc.php ]; then
+		msg info "Generating a default configuration for ${name} (${PREFIX}/${name}/config.inc.php) ..."
+		$cmd cat << EOF > ${PREFIX}/${name}/config.inc.php
 <?php
 /* Generated by buildpkg */
 
 \$cfg['blowfish_secret'] = '$(generate_random 45 0)';
 
 /*
- * Servers configuration
- */
+* Servers configuration
+*/
 \$i = 0;
 
 /*
- * First server
- */
+* First server
+*/
 \$i++;
 /* Authentication type */
 \$cfg['Servers'][\$i]['auth_type'] = 'cookie';
@@ -2521,362 +2526,363 @@ build_phpmyadmin()
 
 ?>
 EOF
-    chown_as_root root root ${PREFIX}/${name}
- fi
+		chown_as_root root root ${PREFIX}/${name}
+	fi
 
- if ! $(update_pkg_version "$name" "$version"); then
-    msg error "Failed to update $name version file."
-    exit 1
- fi
+	if ! $(update_pkg_version "$name" "$version"); then
+		msg error "Failed to update $name version file."
+		exit 1
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # build and install awstats
 build_awstats()
 {
- local name="awstats"
- local version="${AWSTATS_VERSION}"
- local tarball="${name}-${version}.tar.gz"
- local dir="${name}-${version}"
- local url="${AWSTATS_URL}"
- local wwwdir=${DATA}/www
- local wwwdata=${DATA}/${name}
- local cmd=
+	local name="awstats"
+	local version="${AWSTATS_VERSION}"
+	local tarball="${name}-${version}.tar.gz"
+	local dir="${name}-${version}"
+	local url="${AWSTATS_URL}"
+	local wwwdir="${DATA}/www"
+	local wwwdata="${DATA}/${name}"
+	local cmd=""
 
- if [ ${installoff} -eq 1 ]; then
-    msg warn "There is no install section for ${name}."
-    exit 1
- fi
+	if [ ${installoff} -eq 1 ]; then
+		msg warn "There is no install section for ${name}."
+		exit 1
+	fi
 
- if [ $ID -ne 0 ]; then
-    cmd="sudo"
- fi
+	if [ $ID -ne 0 ]; then
+		cmd="sudo"
+	fi
 
- [ -d build ] || mkdir -p build
- cd build
- [ -d ${dir} ] && rm -fr ${dir} || :
+	[ -d build ] || mkdir -p build
+	cd build
+	[ -d ${dir} ] && rm -fr ${dir} || :
 
- get_pkg ${url} ${tarball}
- unpack_source ${tarball}
- chown_dir ${dir}
- cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
+	get_pkg ${url} ${tarball}
+	unpack_source ${tarball}
+	chown_dir ${dir}
+	cd ${dir} >/dev/null 2>&1 || { msg error "Failed to change directory."; exit 1; }
 
- get_dependency ${name}
+	get_dependency ${name}
 
- mkdir_as_root ${PREFIX}/${name}/conf 0755
- mkdir_as_root ${PREFIX}/${name}/bin 0755
- mkdir_as_root ${wwwdir} 0755
- mkdir_as_root ${wwwdata} 0755
+	mkdir_as_root ${PREFIX}/${name}/conf 0755
+	mkdir_as_root ${PREFIX}/${name}/bin 0755
+	mkdir_as_root ${wwwdir} 0755
+	mkdir_as_root ${wwwdata} 0755
 
- $cmd cp -aRf wwwroot ${PREFIX}/${name}/
- $cmd cp -aRf tools ${PREFIX}/${name}/
- $cmd cp -aRf docs ${PREFIX}/${name}/
- $cmd find ${PREFIX}/${name} -type f -exec chmod 0644 {} \;
- $cmd find ${PREFIX}/${name} -type d -exec chmod 0755 {} \;
- chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
- chown_as_root root root ${PREFIX}/${name}
- chown_as_root www root ${wwwdata}
- cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
+	$cmd cp -aRf wwwroot ${PREFIX}/${name}/
+	$cmd cp -aRf tools ${PREFIX}/${name}/
+	$cmd cp -aRf docs ${PREFIX}/${name}/
+	$cmd find ${PREFIX}/${name} -type f -exec chmod 0644 {} \;
+	$cmd find ${PREFIX}/${name} -type d -exec chmod 0755 {} \;
+	chmod_as_root 0755 "${PREFIX}/${name}/wwwroot/cgi-bin/*.pl"
+	chown_as_root root root ${PREFIX}/${name}
+	chown_as_root www root ${wwwdata}
+	cp_as_root wwwroot/cgi-bin/${name}.model.conf ${PREFIX}/${name}/conf/${name}.model.conf
 
- ( cd ${wwwdir}
-   [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name}/wwwroot ${name}
- )
+	( cd ${wwwdir}
+	  [ -L ${name} ] || ln_as_root ../..${PREFIX}/${name}/wwwroot ${name}
+	)
 
- rm_as_root ${PREFIX}/${name}/wwwroot/cgi-bin/awstats.model.conf
+	rm_as_root ${PREFIX}/${name}/wwwroot/cgi-bin/awstats.model.conf
 
- [ -e ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl ] && \
- $cmd sed -i \
-     -e "s|/usr/local/etc/awstats|${PREFIX}/${name}/conf|g" \
-     ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl
+	[ -e ${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl ] && \
+	$cmd sed -i \
+		-e "s|/usr/local/etc/awstats|${PREFIX}/${name}/conf|g" \
+		${PREFIX}/${name}/wwwroot/cgi-bin/${name}.pl
 
- if [ ! -x ${PREFIX}/${name}/bin/create-awstats-config.sh ]; then
-    msg info "Copying config generator script for ${name} (create-awstats-config.sh) ..."
-    cp_as_root $CWD/scripts/create-awstats-config.sh ${PREFIX}/${name}/bin/create-awstats-config.sh
-    chown_as_root root root ${PREFIX}/${name}/bin/create-awstats-config.sh
-    chmod_as_root 0755 ${PREFIX}/${name}/bin/create-awstats-config.sh
-    [ -e ${PREFIX}/${name}/bin/create-awstats-config.sh ] && \
-    $cmd sed -i \
-       -e "s|@@DATA@@|${wwwdata}|g" \
-       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-       ${PREFIX}/${name}/bin/create-awstats-config.sh
- fi
+	if [ ! -x ${PREFIX}/${name}/bin/create-awstats-config.sh ]; then
+		msg info "Copying config generator script for ${name} (create-awstats-config.sh) ..."
+		cp_as_root $CWD/scripts/create-awstats-config.sh ${PREFIX}/${name}/bin/create-awstats-config.sh
+		chown_as_root root root ${PREFIX}/${name}/bin/create-awstats-config.sh
+		chmod_as_root 0755 ${PREFIX}/${name}/bin/create-awstats-config.sh
+		[ -e ${PREFIX}/${name}/bin/create-awstats-config.sh ] && \
+		$cmd sed -i \
+			-e "s|@@DATA@@|${wwwdata}|g" \
+			-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+			${PREFIX}/${name}/bin/create-awstats-config.sh
+	fi
 
- if [ ! -x ${PREFIX}/${name}/bin/update-awstats.sh ]; then
-    msg info "Copying statistics generator script for ${name} (update-awstats.sh) ..."
-    cp_as_root $CWD/scripts/update-awstats.sh ${PREFIX}/${name}/bin/update-awstats.sh
-    chown_as_root root root ${PREFIX}/${name}/bin/update-awstats.sh
-    chmod_as_root 0755 ${PREFIX}/${name}/bin/update-awstats.sh
-    [ -e ${PREFIX}/${name}/bin/update-awstats.sh ] && \
-    $cmd sed -i \
-       -e "s|@@DATA@@|${wwwdata}|g" \
-       -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-       ${PREFIX}/${name}/bin/update-awstats.sh
- fi
+	if [ ! -x ${PREFIX}/${name}/bin/update-awstats.sh ]; then
+		msg info "Copying statistics generator script for ${name} (update-awstats.sh) ..."
+		cp_as_root $CWD/scripts/update-awstats.sh ${PREFIX}/${name}/bin/update-awstats.sh
+		chown_as_root root root ${PREFIX}/${name}/bin/update-awstats.sh
+		chmod_as_root 0755 ${PREFIX}/${name}/bin/update-awstats.sh
+		[ -e ${PREFIX}/${name}/bin/update-awstats.sh ] && \
+		$cmd sed -i \
+			-e "s|@@DATA@@|${wwwdata}|g" \
+			-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+			${PREFIX}/${name}/bin/update-awstats.sh
+	fi
 
- if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
-    if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
-       mkdir_as_root ${PREFIX}/nginx/conf/sites.d
-       msg info "Copying new configuration file for nginx (${name}.conf) ..."
-       cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
-       [ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
-       $cmd sed -i \
-          -e "s|@@DATA@@|${DATA}/www/${name}|g" \
-          -e "s|@@TMPSRV@@|${TMPSRV}|g" \
-          ${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
-       chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
-    fi
- fi
+	if [ -e ${PREFIX}/nginx/conf/nginx.conf ]; then
+		if [ ! -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ]; then
+			mkdir_as_root ${PREFIX}/nginx/conf/sites.d
+			msg info "Copying new configuration file for nginx (${name}.conf) ..."
+			cp_as_root $CWD/config.d/nginx.${name}.conf ${PREFIX}/nginx/conf/sites.d/${name}.conf
+			[ -e ${PREFIX}/nginx/conf/sites.d/${name}.conf ] && \
+			$cmd sed -i \
+				-e "s|@@DATA@@|${DATA}/www/${name}|g" \
+				-e "s|@@TMPSRV@@|${TMPSRV}|g" \
+				${PREFIX}/nginx/conf/sites.d/${name}.conf >/dev/null 2>&1
+			chown_as_root root root ${PREFIX}/nginx/conf/sites.d/${name}.conf
+		fi
+	fi
 
- [ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
- if [ ! -e /etc/profile.d/${name}.sh ]; then
-    msg info "Copying ${name}.sh to /etc/profile.d ... "
-    cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
-    chown_as_root root root /etc/profile.d/${name}.sh
-    chmod_as_root 0644 /etc/profile.d/${name}.sh
-    [ -e /etc/profile.d/${name}.sh ] && \
-    $cmd sed -i \
-        -e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
-        /etc/profile.d/${name}.sh >/dev/null 2>&1
- fi
+	[ -d /etc/profile.d ] || mkdir_as_root /etc/profile.d 0755
+	if [ ! -e /etc/profile.d/${name}.sh ]; then
+		msg info "Copying ${name}.sh to /etc/profile.d ... "
+		cp_as_root $CWD/profile.d/${name}.sh /etc/profile.d
+		chown_as_root root root /etc/profile.d/${name}.sh
+		chmod_as_root 0644 /etc/profile.d/${name}.sh
+		[ -e /etc/profile.d/${name}.sh ] && \
+		$cmd sed -i \
+			-e "s|@@PREFIX@@|${PREFIX}/${name}|g" \
+			/etc/profile.d/${name}.sh >/dev/null 2>&1
+	fi
 
- if ! $(update_pkg_version "$name" "$version"); then
-    msg error "Failed to update $name version file."
-    exit 1
- fi
+	if ! $(update_pkg_version "$name" "$version"); then
+		msg error "Failed to update $name version file."
+		exit 1
+	fi
 
- cd $CWD
+	cd $CWD
 }
 
 # list all install packages
 list_all()
 {
- local version
- local location
- local pkg_count
+	local version
+	local location
+	local pkg_count
 
- # we only work on debian/ubuntu
- is_debian
+	# we only work on debian/ubuntu
+	is_debian
 
- pkg_count=0
- for name in ${PACKAGES}; do
-    if [ "$name" = "pam_mysql" ]; then
-       location="$PAM_MODULES_DIR"
-    else
-       location=""
-    fi
-    if $(is_pkg_installed $name $location); then
-       version="$(get_pkg_version $name $location)"
-       pkg_count=$(($pkg_count + 1))
-       msg info "package: ${COL_YELLOW}$name${COL_RESET} version: $version"
-    fi
- done
+	pkg_count=0
+	for name in ${PACKAGES}; do
+		if [ "$name" = "pam_mysql" ]; then
+			location="$PAM_MODULES_DIR"
+		else
+			location=""
+		fi
+		if $(is_pkg_installed $name $location); then
+			version="$(get_pkg_version $name $location)"
+			pkg_count=$(($pkg_count + 1))
+			msg info "package: ${COL_YELLOW}$name${COL_RESET} version: $version"
+		fi
+	done
 
- if [ $pkg_count -eq 0 ]; then
-    msg warn "there arent any installed packages."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
- fi
+	if [ $pkg_count -eq 0 ]; then
+		msg warn "there arent any installed packages."
+	else
+		msg info "${COL_RED}$pkg_count${COL_RESET} packages installed."
+	fi
 }
 
 # check whatever a package needs updating or not
 check_pkg()
 {
- local name="$1"
- local location="$2"
- local old_version
- local new_version
+	local name="$1"
+	local location="$2"
+	local old_version
+	local new_version
 
- [ -z "$name" ] && echo 0
+	[ -z "$name" ] && echo 0
 
- old_version="$(get_pkg_version $name $location)"
- if [ "$old_version" != "0" ]; then
-    new_version="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
-    new_version="${!new_version}"
-    if [ "$new_version" != "" ]; then
-       if ! $(version_check "$new_version" "$old_version"); then
-          echo $new_version
-          return
-       fi
-    fi
- fi
- echo 0
+	old_version="$(get_pkg_version $name $location)"
+	if [ "$old_version" != "0" ]; then
+		new_version="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+		new_version="${!new_version}"
+		if [ "$new_version" != "" ]; then
+			if ! $(version_check "$new_version" "$old_version"); then
+				echo $new_version
+				return
+			fi
+		fi
+	fi
+	echo 0
 }
 
 # check what packages are installed and what version they are running
 check_all()
 {
- local old_version
- local new_version
- local location
- local pkg_count
+	local old_version
+	local new_version
+	local location
+	local pkg_count
 
- # we only work on debian/ubuntu
- is_debian
+	# we only work on debian/ubuntu
+	is_debian
 
- pkg_count=0
- for name in ${PACKAGES}; do
-    if [ "$name" = "pam_mysql" ]; then
-       location="$PAM_MODULES_DIR"
-    else
-       location=""
-    fi
-    if $(is_pkg_installed $name $location); then
-       old_version="$(get_pkg_version $name $location)"
-       if [ "$old_version" != "0" ]; then
-          new_version="$(check_pkg $name $location)"
-          if [ "$new_version" != "0" ]; then
-             if ! $(version_check "$new_version" "$old_version"); then
-                pkg_count=$(($pkg_count + 1))
-                msg info "package: ${COL_YELLOW}$name${COL_RESET}"
-                msg info "-> new version: ${COL_RED}$new_version${COL_RESET} current version: $old_version"
-             fi
-          fi
-       fi
-    fi
- done
+	pkg_count=0
+	for name in ${PACKAGES}; do
+		if [ "$name" = "pam_mysql" ]; then
+			location="$PAM_MODULES_DIR"
+		else
+			location=""
+		fi
 
- if [ $pkg_count -eq 0 ]; then
-    msg warn "there arent any available updates."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
- fi
+		if $(is_pkg_installed $name $location); then
+			old_version="$(get_pkg_version $name $location)"
+			if [ "$old_version" != "0" ]; then
+				new_version="$(check_pkg $name $location)"
+				if [ "$new_version" != "0" ]; then
+					if ! $(version_check "$new_version" "$old_version"); then
+						pkg_count=$(($pkg_count + 1))
+						msg info "package: ${COL_YELLOW}$name${COL_RESET}"
+						msg info "-> new version: ${COL_RED}$new_version${COL_RESET} current version: $old_version"
+					fi
+				fi
+			fi
+		fi
+	done
+
+	if [ $pkg_count -eq 0 ]; then
+		msg warn "there arent any available updates."
+	else
+		msg info "${COL_RED}$pkg_count${COL_RESET} updates available."
+	fi
 }
 
 # update package what have a new version
 update_all()
 {
- local old_version
- local new_version
- local location
- local pkg_count
+	local old_version
+	local new_version
+	local location
+	local pkg_count
 
- # we only work on debian/ubuntu
- is_debian
+	# we only work on debian/ubuntu
+	is_debian
 
- pkg_count=0
- for name in ${PACKAGES}; do
-    if [ "$name" = "pam_mysql" ]; then
-       location="$PAM_MODULES_DIR"
-    else
-       location=""
-    fi
-    if $(is_pkg_installed $name $location); then
-       old_version="$(get_pkg_version $name $location)"
-       if [ "$old_version" != "0" ]; then
-          new_version="$(check_pkg $name $location)"
-          if [ "$new_version" != "0" ]; then
-             if ! $(version_check "$new_version" "$old_version"); then
-                pkg_count=$(($pkg_count + 1))
-		msg info "package ${COL_YELLOW}$name${COL_RESET} will be updated to version ${COL_RED}$new_version${COL_RESET}"
-		build_$name
-             fi
-          fi
-       fi
-    fi
- done
+	pkg_count=0
+	for name in ${PACKAGES}; do
+		if [ "$name" = "pam_mysql" ]; then
+			location="$PAM_MODULES_DIR"
+		else
+			location=""
+		fi
 
- if [ $pkg_count -eq 0 ]; then
-    msg warn "there arent any packages to update."
- else
-    msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
- fi
+		if $(is_pkg_installed $name $location); then
+			old_version="$(get_pkg_version $name $location)"
+			if [ "$old_version" != "0" ]; then
+				new_version="$(check_pkg $name $location)"
+				if [ "$new_version" != "0" ]; then
+					if ! $(version_check "$new_version" "$old_version"); then
+						pkg_count=$(($pkg_count + 1))
+						msg info "package ${COL_YELLOW}$name${COL_RESET} will be updated to version ${COL_RED}$new_version${COL_RESET}"
+						build_$name
+					fi
+				fi
+			fi
+		fi
+	done
+
+	if [ $pkg_count -eq 0 ]; then
+		msg warn "there arent any packages to update."
+	else
+		msg info "${COL_RED}$pkg_count${COL_RESET} packages updated."
+	fi
 }
 
 # build and install a specific package
 build_pkg()
 {
- local name="$1"
- local location=""
- local ver=""
+	local name="$1"
+	local location=""
+	local ver=""
 
- if [ -n "$name" ]; then
-    if [ "$name" = "pam_mysql" ]; then
-       location="$PAM_MODULES_DIR"
-    else
-       location=""
-    fi
-    if ! $(is_pkg_installed $name $location); then
-       ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
-       ver="${!ver}"
-       msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
-       build_$name
-    else
-       msg warn "${COL_RED}${name}${COL_RESET} already installed."
-    fi
- else
-    msg error "${COL_RED}${name}${COL_RESET} invalid package name or package not available."
- fi
+	if [ -n "$name" ]; then
+		if [ "$name" = "pam_mysql" ]; then
+			location="$PAM_MODULES_DIR"
+		else
+			location=""
+		fi
+
+		if ! $(is_pkg_installed $name $location); then
+			ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+			ver="${!ver}"
+			msg info "-- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
+			build_$name
+		else
+			msg warn "${COL_RED}${name}${COL_RESET} already installed."
+		fi
+	else
+		msg error "${COL_RED}${name}${COL_RESET} invalid package name or package not available."
+	fi
 }
 
 # build and install all available packages
 build_all()
 {
- msg warn "Building all available packages: $(echo ${PACKAGES} | sed 's/ /, /g')"
- msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
- msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
- read
+	msg warn "Building all available packages: $(echo ${PACKAGES} | sed 's/ /, /g')"
+	msg warn "This option will build all packages and it can take up to several hours to finish depending on the speed of your computer."
+	msg warn "If you are not sure what you are doing, just press now Ctrl+C to stop or Enter to continue with package build."
+	read
 
- # we only work on debian/ubuntu
- is_debian
-
- for name in ${PACKAGES}; do
-    ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
-    ver="${!ver}"
-    msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
-    build_${name}
- done
+	# we only work on debian/ubuntu
+	is_debian
+	for name in ${PACKAGES}; do
+		ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+		ver="${!ver}"
+		msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
+		build_${name}
+	done
 }
 
 build_template()
 {
- local templ="$1"
+	local templ="$1"
 
- if [ -z "$templ" ]; then
-    msg error "You must specify a template (valid templates are: lemp, mail, extra)"
-    exit 1
- fi
+	if [ -z "$templ" ]; then
+		msg error "You must specify a template (valid templates are: lemp, mail, extra)"
+		exit 1
+	fi
 
- # we only work on debian/ubuntu
- is_debian
- 
- case "$templ" in
-    lemp)
-        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_lemp[*]})"
-        for name in ${tmpl_lemp[@]}; do
-           build_pkg $name
-        done
-    ;;
+	# we only work on debian/ubuntu
+	is_debian
 
-    mail)
-        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mail[*]})"
-        for name in ${tmpl_mail[@]}; do
-           build_pkg $name
-        done
-    ;;
+	case "$templ" in
+		lemp)
+			msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_lemp[*]})"
+			for name in ${tmpl_lemp[@]}; do
+				build_pkg $name
+			done
+		;;
 
-    extra)
-        msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_extra[*]})"
-        for name in ${tmpl_extra[@]}; do
-           build_pkg $name
-        done
-    ;;
+		mail)
+			msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_mail[*]})"
+			for name in ${tmpl_mail[@]}; do
+				build_pkg $name
+			done
+		;;
 
-    *)
-       msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, extra)"
-       exit 1
-    ;;
+		extra)
+			msg info "--> Building template ${COL_RED}$templ${COL_RESET} (${tmpl_extra[*]})"
+			for name in ${tmpl_extra[@]}; do
+				build_pkg $name
+			done
+		;;
 
- esac
+		*)
+			msg error "${COL_YELLOW}$templ${COL_RESET} is not a valid template (valid templates are: lemp, mail, extra)"
+			exit 1
+		;;
+	esac
 }
 
 # trap Ctrl+C
 control_c()
 {
- echo
- msg warn "Ctrl+C was pressed, we are exiting ..."
- sleep 2
- exit $?
+	echo
+	msg warn "Ctrl+C was pressed, we are exiting ..."
+	sleep 1
+	exit $?
 }
 
 # we only work on debian/ubuntu
@@ -2896,80 +2902,80 @@ trap control_c SIGINT
 
 OPTS="$@"
 if [ -z "${OPTS}" ]; then
-   usage
-   msg error "no arguments supplied." 1>&2
-   exit 1
+	usage
+	msg error "no arguments supplied."
+	exit 1
 fi
 
 while [ $# -gt 0 ]; do
- case "$1" in
-  --help)
-     usage
-     exit 0
-  ;;
+	case "$1" in
+		--help)
+			usage
+			exit 0
+		;;
 
-  --list-all)
-     list_all
-     exit 0
-  ;;
+		--list-all)
+			list_all
+			exit 0
+		;;
 
-  --check-all)
-     check_all
-     exit 0
-  ;;
+		--check-all)
+			check_all
+			exit 0
+		;;
 
-  --update-all)
-     update_all
-     exit 0
-  ;;
+		--update-all)
+			update_all
+			exit 0
+		;;
 
-  --dont-trigger)
-     export triggeroff=1
-  ;;
+		--dont-trigger)
+			export triggeroff=1
+		;;
 
-  --dont-install)
-     export installoff=1
-  ;;
+		--dont-install)
+			export installoff=1
+		;;
 
-  --pkg=*)
-     export name="${1##--pkg=}"
-  ;;
+		--pkg=*)
+			export name="${1##--pkg=}"
+		;;
 
-  --template=*)
-     export tmpl="${1##--template=}"
-     build_template $tmpl
-     exit 0
-  ;;
+		--template=*)
+			export tmpl="${1##--template=}"
+			build_template $tmpl
+			exit 0
+		;;
 
-  --all)
-     export buildall=1
-     build_all
-     exit 0
-  ;;
+		--all)
+			export buildall=1
+			build_all
+			exit 0
+		;;
 
-  *)
-     usage
-     msg error "missing or wrong arguments."
-     exit 1
-  ;;
+		*)
+			usage
+			msg error "missing or wrong arguments."
+			exit 1
+		;;
 
- esac
- shift
+	esac
+	shift
 done
 
 if [ -n "${name}" ]; then
-   if $(echo ${PACKAGES} | grep -qw ${name} 2>/dev/null); then
-      ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
-      ver="${!ver}"
-      msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
-      build_${name}
-   else
-      msg error "${name} there is no such package available."
-      exit 1
-   fi
+	if $(echo ${PACKAGES} | grep -qw ${name} 2>/dev/null); then
+		ver="$(echo $name | tr '[:lower:]' '[:upper:]')_VERSION"
+		ver="${!ver}"
+		msg info "--- Building now package: ${COL_RED}${name}${COL_RESET} ($ver)"
+		build_${name}
+	else
+		msg error "${name} there is no such package available."
+		exit 1
+	fi
 else
-   msg error "package name not specified."
-   exit 1
+	msg error "package name not specified."
+	exit 1
 fi
 
 exit 0

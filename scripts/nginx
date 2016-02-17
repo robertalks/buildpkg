@@ -10,86 +10,87 @@
 # Description:       starts nginx using start-stop-daemon
 ### END INIT INFO
 
-prefix=@@PREFIX@@
-DAEMON=${prefix}/sbin/nginx
+prefix="@@PREFIX@@"
+TMPSRV="@@TMPSRV@@"
+DAEMON="${prefix}/sbin/nginx"
 NAME=nginx
 DESC=nginx
+CUSER=www
 
-PATH=${prefix}/sbin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-test -x $DAEMON || exit 0
+PATH=${prefix}/sbin:/sbin:/bin:/usr/sbin:/usr/bin
+test -x $DAEMON || exit 1
 set -e
 
 . /lib/lsb/init-functions
 ulimit -n 2048
 
-user=www
 sanity()
 {
- [ -d /var/log/nginx ] || mkdir -p -m 0770 /var/log/nginx
- chown ${user}.root -R /var/log/nginx
- chmod 0770 /var/log/nginx
- mkdir -p -m 0770 @@TMPSRV@@/nginx
- mkdir -p -m 0770 @@TMPSRV@@/nginx/fastcgi
- mkdir -p -m 0770 @@TMPSRV@@/nginx/client
- mkdir -p -m 0770 @@TMPSRV@@/nginx/proxy
- mkdir -p -m 0770 @@TMPSRV@@/nginx/scgi
- mkdir -p -m 0770 @@TMPSRV@@/nginx/uwsgi
- chown ${user}.${user} -R @@TMPSRV@@/nginx
+	[ -d /var/log/nginx ] || mkdir -p -m 0770 /var/log/nginx
+	for dir in fastcgi client proxy scgi uwsgi; do
+		[ -d "${TMPDRV}/nginx/$dir" ] || mkdir -p -m 0770 "${TMPDRV}/nginx/$dir"
+	done
+	chown ${CUSER}:${CUSER} -R "${TMPSRV}/nginx"
 }
 
 start_nginx()
 {
- sanity
- log_daemon_msg "Starting nginx http server" "$DESC"
- if start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
-           --exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
-    log_end_msg 0
- else
-    log_end_msg 1
- fi
+	log_daemon_msg "Starting nginx http server" "$DESC"
+	sanity
+	if start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
+			--exec $DAEMON -- $DAEMON_OPTS >/dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
 stop_nginx()
 {
- log_daemon_msg "Stopping nginx http server" "$DESC"
- if start-stop-daemon --stop --quiet --pidfile /var/run/$NAME.pid \
-               --exec $DAEMON >/dev/null 2>&1; then
-    log_end_msg 0
- else
-    log_end_msg 1
- fi
- sanity
+	log_daemon_msg "Stopping nginx http server" "$DESC"
+	if start-stop-daemon --stop --quiet --pidfile /var/run/$NAME.pid \
+			--exec $DAEMON >/dev/null 2>&1; then
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
 }
 
+reload_nginx()
+{
+	log_daemon_msg "Reloading nginx http server configuration" "$DESC"
+	sanity
+	if start-stop-daemon --stop --signal HUP --quiet --pidfile /var/run/$NAME.pid \
+			--exec $DAEMON >/dev/null 2>&1; the
+		log_end_msg 0
+	else
+		log_end_msg 1
+	fi
+}
 case "$1" in
-  start)
-    start_nginx
-  ;;
+	start)
+		start_nginx
+	;;
 
-  stop)
-    stop_nginx
-  ;;
+	stop)
+		stop_nginx
+	;;
 
-  restart|force-reload)
-    stop_nginx
-    sleep 3
-    start_nginx
-  ;;
+	restart|force-reload)
+		stop_nginx
+		sleep 2
+		start_nginx
+	;;
 
-  reload)
-    log_daemon_msg "Reloading nginx http server configuration" "$DESC"
-    if start-stop-daemon --stop --signal HUP --quiet --pidfile /var/run/$NAME.pid \
-          --exec $DAEMON >/dev/null 2>&1; then
-       log_end_msg 0
-    else
-       log_end_msg 1
-    fi
-  ;;
-  *)
-    N=/etc/init.d/$NAME
-    echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
-    exit 1
-  ;;
+	reload)
+		reload_nginx
+	;;
+
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N {start|stop|restart|reload|force-reload}" >&2
+		exit 1
+	;;
 esac
 
 exit 0

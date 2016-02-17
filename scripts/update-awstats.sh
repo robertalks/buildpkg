@@ -7,7 +7,7 @@ NAME="$(basename $0 2>/dev/null)"
 PREFIX="@@PREFIX@@"
 AWSTATS="${PREFIX}/wwwroot/cgi-bin/awstats.pl"
 DATA="@@DATA@@"
-DOMAIN=$1
+DOMAIN="$1"
 DATE="$(date '+%m%Y')"
 USER=www
 

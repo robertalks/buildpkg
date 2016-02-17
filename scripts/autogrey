@@ -1,9 +1,11 @@
 #!/bin/sh -e
 
-@@PREFIX@@/sbin/greyfix \
-  --home /var/lib/greyfix \
-  --greylisted-action "PREPEND X-Greyfix: Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
-  --reject-action "DEFER_IF_PERMIT Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
-  -/ 24 "$@"
+prefix="@@PREFIX@@"
 
-exit $?
+PATH=${prefix}/sbin:/sbin:/bin:/usr/sbin:/usr/bin
+[ -x ${prefix}/sbin/greyfix ] || exit 1
+
+${prefix}/sbin/greyfix --home /var/lib/greyfix \
+	--greylisted-action "PREPEND X-Greyfix: Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
+	--reject-action "DEFER_IF_PERMIT Greylisted by greyfix for %d second%p. See http://@@HOST@@ for more information." \
+	-/ 24 "$@"
