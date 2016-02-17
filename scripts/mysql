@@ -47,14 +47,14 @@ wait_for_pid()
 
 	while [ $i -ne $service_startup_timeout ]; do
 		case "$verb" in
-			'created')
+			created)
 				# wait for a PID-file to pop into existence.
 				if [ -s "${pid_file_path}" ]; then
 					ok=1
 					break
 				fi
 			;;
-			'removed')
+			removed)
 				# wait for this PID-file to disappear
 				if [ ! -s "${pid_file_path}" ]; then
 					ok=1
@@ -244,7 +244,7 @@ case "$1" in
 
 	*)
 		N=/etc/init.d/$NAME
-		echo "Usage: $N  {start|stop|restart|reload|force-reload|status}"
+		echo "Usage: $N {start|stop|restart|reload|force-reload|status}"
 		exit 1
 	;;
 esac
