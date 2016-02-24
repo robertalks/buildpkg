@@ -2520,9 +2520,15 @@ build_phpmyadmin()
 /* Select mysql if your server does not have mysqli */
 \$cfg['Servers'][\$i]['extension'] = 'mysqli';
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
+/* Hide from the view information_schema and performance_schema system dbs */
+\$cfg['Servers'][\$i]['hide_db'] = '^(information_schema|performance_schema)\$';
 
 \$cfg['UploadDir'] = '${TMPSRV}/php/tmp';
 \$cfg['SaveDir'] = '${TMPSRV}/php/tmp';
+
+/* Set validity of cookie login to 5 minutes (300 seconds)
+\$cfg['LoginCookieValidity'] = 300;
+\$cfg['LoginCookieValidityDisableWarning'] = true;
 
 ?>
 EOF
