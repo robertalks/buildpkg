@@ -549,7 +549,7 @@ apply_patch()
 			echo "applying patch ${patch_file} ..." >> ${logfile}
 			$cmd ${patch_file} | patch -p${strip_level} >> ${logfile} 2>&1
 			if [ $? -ne 0 ]; then
-				msg error "unable to apply patch ${patch_file}."
+				msg error "unable to apply patch ${patch_file}"
 				exit 1
 			fi
 		fi
