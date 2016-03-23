@@ -2512,7 +2512,7 @@ build_phpmyadmin()
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
 
 /* Hide from the view information_schema and performance_schema system dbs */
-\$cfg['Servers'][\$i]['hide_db'] = '^(information_schema|performance_schema)\$';
+\$cfg['Servers'][\$i]['hide_db'] = '^(information_schema|performance_schema|mysql)\$';
 
 \$cfg['UploadDir'] = '${TMPSRV}/php/tmp';
 \$cfg['SaveDir'] = '${TMPSRV}/php/tmp';
